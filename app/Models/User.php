@@ -24,7 +24,6 @@ public function loans() { return $this->hasMany(Loan::class); }
     protected $fillable = [
         'name',
         'phone',
-        'email',
         'password',
     ];
 
@@ -44,7 +43,6 @@ public function loans() { return $this->hasMany(Loan::class); }
      * @var array<string, string>
      */
     protected $casts = [
-        'email_verified_at' => 'datetime',
         'password' => 'hashed',
     ];
 
@@ -53,6 +51,6 @@ public function loans() { return $this->hasMany(Loan::class); }
      */
     public function username()
     {
-        return 'email';
+        return 'phone';
     }
 }

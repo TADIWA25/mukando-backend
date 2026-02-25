@@ -2,10 +2,11 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\Api\GroupController;
-use App\Http\Controllers\Api\ContributionController;
-use App\Http\Controllers\Api\LoanController;
+use App\Http\Controllers\ContributionController;
+// LoanController is missing, commenting out to prevent errors
+// use App\Http\Controllers\Api\LoanController;
 // use Illuminate\Support\Facades\Route;
 /*
 |--------------------------------------------------------------------------
@@ -39,10 +40,10 @@ Route::middleware('auth:sanctum')->group(function() {
     Route::get('/contributions', [ContributionController::class,'index']);
     Route::post('/contributions', [ContributionController::class,'store']);
 
-    // Loans
-    Route::get('/loans', [LoanController::class,'index']);
-    Route::post('/loans', [LoanController::class,'store']);
-    Route::post('/loans/pay', [LoanController::class,'pay']);
+    // Loans (Controller missing)
+    // Route::get('/loans', [LoanController::class,'index']);
+    // Route::post('/loans', [LoanController::class,'store']);
+    // Route::post('/loans/pay', [LoanController::class,'pay']);
 
     // Notifications
     Route::get('/notifications', [ContributionController::class,'overdue']);
