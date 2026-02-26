@@ -57,6 +57,7 @@ public function currentPeriodEnd()
         parent::boot();
 
         static::creating(function ($group) {
+            $group->invite_code = strtoupper(substr(md5(uniqid(rand(), true)), 0, 6));
             if (auth()->check() && !$group->created_by) {
                 $group->created_by = auth()->id();
             }

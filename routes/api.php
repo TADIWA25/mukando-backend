@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\GroupController;
 use App\Http\Controllers\ContributionController;
+use App\Http\Controllers\GroupInviteController;
 // LoanController is missing, commenting out to prevent errors
 // use App\Http\Controllers\Api\LoanController;
 // use Illuminate\Support\Facades\Route;
@@ -36,7 +37,7 @@ Route::middleware('auth:sanctum')->group(function() {
     Route::post('/groups', [GroupController::class,'store']);
     Route::get('/groups/{id}', [GroupController::class,'show']);
     Route::post('/groups/join', [GroupController::class,'join']);
-
+    Route::post('/groups/join', [GroupInviteController::class, 'join']);
     // Contributions
     Route::get('/contributions', [ContributionController::class,'index']);
     Route::post('/contributions', [ContributionController::class,'store']);
