@@ -10,10 +10,10 @@ use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    // Group.php
-public function members() { return $this->hasMany(GroupMember::class); }
-public function contributions() { return $this->hasMany(Contribution::class); }
-public function loans() { return $this->hasMany(Loan::class); }
+    public function members() { return $this->hasMany(GroupMember::class); }
+    public function groups() { return $this->belongsToMany(Group::class, 'group_members')->withPivot('role')->withTimestamps(); }
+    public function contributions() { return $this->hasMany(Contribution::class); }
+    public function loans() { return $this->hasMany(Loan::class); }
     use HasApiTokens, HasFactory, Notifiable;
 
     /**
