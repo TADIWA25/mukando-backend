@@ -13,14 +13,15 @@ class ContributionController extends Controller
         $request->validate([
             'user_id' => 'required|exists:users,id',
             'group_id' => 'required|exists:groups,id',
+            'cycle_id' => 'required|exists:contribution_cycles,id',
             'amount' => 'required|numeric|min:0',
         ]);
 
-        // Check if the user already paid for this group this month (or week depending on frequency)
+        // Ensure each member is marked paid at most once per cycle.
         $alreadyPaid = Contribution::where('user_id', $request->user_id)
             ->where('group_id', $request->group_id)
-            ->whereMonth('paid_at', Carbon::now()->month)
-            ->whereYear('paid_at', Carbon::now()->year)
+            ->where('cycle_id', $request->cycle_id)
+            ->where('status', 'paid')
             ->exists();
 
         if ($alreadyPaid) {
@@ -32,13 +33,11 @@ class ContributionController extends Controller
         $contribution = Contribution::create([
             'user_id' => $request->user_id,
             'group_id' => $request->group_id,
-            'amount' => $request->amount,
+            'cycle_id' => $request->cycle_id,
+            'amount_paid' => $request->amount,
+            'status' => 'paid',
             'paid_at' => Carbon::now(),
         ]);
-        // ✅ Update group total
-        $group = $contribution->group;
-        $total = $group->contributions()->sum('amount');
-        $group->update(['total_collected' => $total]);
 
         return response()->json([
             'message' => 'Contribution recorded successfully.',

@@ -5,7 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Group;
 use App\Models\GroupMember;
-use Illuminate\Support\Facades\Auth;
+use App\Models\Contribution;
+use Illuminate\Support\Facades\DB;
 
 class GroupInviteController extends Controller
 {
@@ -17,7 +18,7 @@ class GroupInviteController extends Controller
         ]);
 
         // Find the group
-        $group = Group::where('invite_code', $request->invite_code)->first();
+        $group = Group::where('invite_code', strtoupper($request->invite_code))->first();
         if (!$group) {
             return response()->json([
                 'status' => 'error',
@@ -25,7 +26,7 @@ class GroupInviteController extends Controller
             ], 404);
         }
 
-        $userId = Auth::id(); // Ensure user is logged in via Sanctum or other auth
+        $userId = $request->user()->id;
 
         // Check if already a member
         $existing = GroupMember::where('group_id', $group->id)
@@ -39,12 +40,27 @@ class GroupInviteController extends Controller
             ], 400);
         }
 
-        // Add user to group_members
-        GroupMember::create([
-            'group_id' => $group->id,
-            'user_id' => $userId,
-            'role' => 'member',
-        ]);
+        DB::transaction(function () use ($group, $userId) {
+            GroupMember::create([
+                'group_id' => $group->id,
+                'user_id' => $userId,
+                'role' => 'member',
+            ]);
+
+            $openCycleIds = $group->cycles()
+                ->where('status', 'open')
+                ->pluck('id');
+
+            foreach ($openCycleIds as $cycleId) {
+                Contribution::firstOrCreate([
+                    'group_id' => $group->id,
+                    'cycle_id' => $cycleId,
+                    'user_id' => $userId,
+                ], [
+                    'status' => 'pending',
+                ]);
+            }
+        });
 
         return response()->json([
             'status' => 'success',

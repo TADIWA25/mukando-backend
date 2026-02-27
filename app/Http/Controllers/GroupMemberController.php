@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Group;
 use App\Models\GroupMember;
+use Illuminate\Support\Facades\DB;
 
 class GroupMemberController extends Controller
 {
@@ -32,9 +33,57 @@ class GroupMemberController extends Controller
             'members' => $data,
         ]);
     }
-    public function destroy(Group $group, GroupMember $member)
+
+    public function promote(Request $request, Group $group, GroupMember $member)
     {
-        $userId = Auth::id();
+        if ($member->group_id !== $group->id) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Member does not belong to this group',
+            ], 404);
+        }
+
+        $isAdmin = GroupMember::where('group_id', $group->id)
+            ->where('user_id', $request->user()->id)
+            ->where('role', 'admin')
+            ->exists();
+
+        if (!$isAdmin) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Only group admins can promote members',
+            ], 403);
+        }
+
+        DB::transaction(function () use ($group, $member) {
+            GroupMember::where('group_id', $group->id)
+                ->where('role', 'admin')
+                ->update(['role' => 'member']);
+
+            $member->update(['role' => 'admin']);
+        });
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Member promoted to admin successfully',
+            'data' => [
+                'group_id' => $group->id,
+                'user_id' => $member->user_id,
+                'role' => 'admin',
+            ],
+        ]);
+    }
+
+    public function destroy(Request $request, Group $group, GroupMember $member)
+    {
+        if ($member->group_id !== $group->id) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Member does not belong to this group'
+            ], 404);
+        }
+
+        $userId = $request->user()->id;
 
         // Check if the logged-in user is an admin of this group
         $admin = GroupMember::where('group_id', $group->id)

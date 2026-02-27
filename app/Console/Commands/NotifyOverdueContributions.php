@@ -29,10 +29,9 @@ class NotifyOverdueContributions extends Command
                 ->first();
 
             $frequencyDays = match ($group->frequency) {
+                'daily' => 1,
                 'weekly' => 7,
-                'bi-monthly' => 15,
                 'monthly' => 30,
-                'yearly' => 365,
                 default => 30
             };
 

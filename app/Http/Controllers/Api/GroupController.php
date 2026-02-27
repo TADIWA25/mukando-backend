@@ -6,6 +6,10 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Group;
 use App\Models\GroupMember;
+use App\Models\Contribution;
+use App\Models\ContributionCycle;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class GroupController extends Controller
 {
@@ -24,36 +28,68 @@ class GroupController extends Controller
         $request->validate([
             'name' => 'required|string',
             'type' => 'required|in:contribution,rounds,shared',
-            'contribution_amount' => 'nullable|numeric',
-            'frequency' => 'nullable|in:weekly,monthly,bi-monthly,yearly',
-            'interest_rate' => 'nullable|numeric',
+            'target_amount' => 'required|numeric|min:0.01',
+            'contribution_amount' => 'required|numeric|min:0.01|lte:target_amount',
+            'frequency' => 'required|in:daily,weekly,monthly',
+            'start_date' => 'required|date',
         ]);
 
-        $group = Group::create([
-            'name' => $request->name,
-            'type' => $request->type,
-            'contribution_amount' => $request->contribution_amount,
-            'frequency' => $request->frequency,
-            'interest_rate' => $request->interest_rate,
-            'created_by' => $request->user()->id,
-        ]);
+        $group = DB::transaction(function () use ($request) {
+            $group = Group::create([
+                'name' => $request->name,
+                'type' => $request->type,
+                'target_amount' => $request->target_amount,
+                'contribution_amount' => $request->contribution_amount,
+                'frequency' => $request->frequency,
+                'status' => 'active',
+                'created_by' => $request->user()->id,
+            ]);
 
-        GroupMember::create([
-            'user_id' => $request->user()->id,
-            'group_id' => $group->id,
-            'role' => 'admin'
-        ]);
+            GroupMember::create([
+                'user_id' => $request->user()->id,
+                'group_id' => $group->id,
+                'role' => 'admin',
+            ]);
+
+            $startDate = Carbon::parse($request->start_date);
+            $cycleCount = (int) ceil((float) $request->target_amount / (float) $request->contribution_amount);
+            $cycleCount = max(1, $cycleCount);
+
+            for ($i = 1; $i <= $cycleCount; $i++) {
+                $dueDate = match ($request->frequency) {
+                    'daily' => $startDate->copy()->addDays($i - 1),
+                    'weekly' => $startDate->copy()->addWeeks($i - 1),
+                    'monthly' => $startDate->copy()->addMonthsNoOverflow($i - 1),
+                };
+
+                $cycle = ContributionCycle::create([
+                    'group_id' => $group->id,
+                    'cycle_number' => $i,
+                    'due_date' => $dueDate->toDateString(),
+                    'status' => 'open',
+                ]);
+
+                Contribution::create([
+                    'group_id' => $group->id,
+                    'cycle_id' => $cycle->id,
+                    'user_id' => $request->user()->id,
+                    'status' => 'pending',
+                ]);
+            }
+
+            return $group;
+        });
 
         return response()->json([
             'status' => true,
             'message' => 'Group created successfully',
-            'data' => $group->load('members.user')
+            'data' => $group->load('members.user'),
         ], 201);
     }
 
     public function show(Request $request, $id)
     {
-        $group = Group::with(['members.user', 'contributions', 'loans'])->find($id);
+        $group = Group::with(['members.user'])->find($id);
 
         if (!$group) {
             return response()->json([
@@ -62,7 +98,6 @@ class GroupController extends Controller
             ], 404);
         }
 
-        // Check if user is a member of the group
         $isMember = $group->members()->where('user_id', $request->user()->id)->exists();
         if (!$isMember) {
             return response()->json([
@@ -71,38 +106,62 @@ class GroupController extends Controller
             ], 403);
         }
 
-        return response()->json([
-            'status' => true,
-            'message' => 'Group details retrieved successfully',
-            'data' => $group
-        ], 200);
-    }
-
-    public function join(Request $request)
-    {
-        $request->validate(['group_id' => 'required|exists:groups,id']);
-        
-        $alreadyMember = GroupMember::where('user_id', $request->user()->id)
-            ->where('group_id', $request->group_id)
+        $isAdmin = $group->members()
+            ->where('user_id', $request->user()->id)
+            ->where('role', 'admin')
             ->exists();
 
-        if ($alreadyMember) {
-            return response()->json([
-                'status' => false,
-                'message' => 'You are already a member of this group'
-            ], 400);
+        $currentCycle = $group->cycles()
+            ->where('status', 'open')
+            ->orderBy('cycle_number')
+            ->first();
+
+        $totalContributed = Contribution::query()
+            ->where('group_id', $group->id)
+            ->where('status', 'paid')
+            ->sum('amount_paid');
+
+        $paidUserIds = collect();
+        if ($currentCycle) {
+            $paidUserIds = Contribution::query()
+                ->where('group_id', $group->id)
+                ->where('cycle_id', $currentCycle->id)
+                ->where('status', 'paid')
+                ->pluck('user_id');
         }
 
-        $member = GroupMember::create([
-            'user_id' => $request->user()->id,
-            'group_id' => $request->group_id,
-            'role' => 'member'
-        ]);
+        $members = $group->members->map(function ($member) use ($paidUserIds) {
+            return [
+                'user_id' => $member->user_id,
+                'name' => $member->user?->name,
+                'role' => $member->role,
+                'paid_this_cycle' => $paidUserIds->contains($member->user_id),
+            ];
+        })->values();
+
+        $data = [
+            'id' => $group->id,
+            'name' => $group->name,
+            'type' => $group->type,
+            'target_amount' => $group->target_amount,
+            'contribution_amount' => $group->contribution_amount,
+            'frequency' => $group->frequency,
+            'status' => $group->status,
+            'total_contributed' => number_format((float) $totalContributed, 2, '.', ''),
+            'current_cycle' => $currentCycle ? [
+                'id' => $currentCycle->id,
+                'cycle_number' => $currentCycle->cycle_number,
+                'due_date' => optional($currentCycle->due_date)->toDateString(),
+                'status' => $currentCycle->status,
+            ] : null,
+            'members' => $members,
+        ];
 
         return response()->json([
             'status' => true,
-            'message' => 'Joined group successfully',
-            'data' => $member->load('group')
+            'data' => $isAdmin
+                ? array_merge($data, ['invite_code' => $group->invite_code])
+                : $data,
         ], 200);
     }
 }
