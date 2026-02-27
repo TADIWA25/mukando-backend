@@ -2,6 +2,7 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+<<<<<<< HEAD
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\GroupController;
 use App\Http\Controllers\ContributionController;
@@ -11,6 +12,9 @@ use App\Http\Controllers\GroupMemberController;
 // LoanController is missing, commenting out to prevent errors
 // use App\Http\Controllers\Api\LoanController;
 // use Illuminate\Support\Facades\Route;
+=======
+
+>>>>>>> 694c252 (updated files)
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -25,6 +29,7 @@ use App\Http\Controllers\GroupMemberController;
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
+<<<<<<< HEAD
 
 // Public routes
 Route::post('/register', [AuthController::class,'register']);
@@ -54,3 +59,5 @@ Route::middleware('auth:sanctum')->group(function() {
     // Notifications
     Route::get('/notifications', [ContributionController::class,'overdue']);
 });
+=======
+>>>>>>> 694c252 (updated files)
