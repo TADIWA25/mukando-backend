@@ -14,11 +14,39 @@ class GroupController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $groups = Group::query()->latest()->get();
+        $userId = $request->user()->id;
+
+        $memberships = GroupMember::query()
+            ->where('user_id', $userId)
+            ->get(['group_id', 'role'])
+            ->keyBy('group_id');
+
+        $groups = Group::query()
+            ->whereIn('id', $memberships->keys())
+            ->latest()
+            ->get();
+
+        $data = $groups->map(function (Group $group) use ($memberships) {
+            $membership = $memberships->get($group->id);
+            $isAdmin = $membership?->role === 'admin';
+
+            return [
+                'id' => $group->id,
+                'name' => $group->name,
+                'type' => $group->type,
+                'target_amount' => number_format((float) $group->target_amount, 2, '.', ''),
+                'contribution_amount' => number_format((float) $group->contribution_amount, 2, '.', ''),
+                'frequency' => $group->frequency,
+                'status' => $group->status,
+                'role' => $membership?->role,
+                'invite_code' => $group->invite_code,
+                'can_invite' => $isAdmin,
+            ];
+        })->values();
 
         return response()->json([
             'status' => true,
-            'data' => $groups,
+            'data' => $data,
         ]);
     }
 
@@ -141,6 +169,7 @@ class GroupController extends Controller
             'contribution_amount' => number_format((float) $group->contribution_amount, 2, '.', ''),
             'frequency' => $group->frequency,
             'status' => $group->status,
+            'invite_code' => $isAdmin ? $group->invite_code : null,
             'total_contributed' => number_format((float) $totalContributed, 2, '.', ''),
             'current_cycle' => $currentCycle ? [
                 'id' => $currentCycle->id,
@@ -150,10 +179,6 @@ class GroupController extends Controller
             ] : null,
             'members' => $memberPayload,
         ];
-
-        if ($isAdmin) {
-            $data['invite_code'] = $group->invite_code;
-        }
 
         return response()->json([
             'status' => true,
