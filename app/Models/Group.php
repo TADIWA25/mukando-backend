@@ -4,6 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+<<<<<<< HEAD
+=======
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+>>>>>>> 5916f9f (feat: group routes, promote endpoint, show payload, and schema updates)
 use Illuminate\Support\Str;
 
 class Group extends Model
@@ -21,21 +26,55 @@ class Group extends Model
         'created_by',
     ];
 
+<<<<<<< HEAD
     public function members()
+=======
+    protected $casts = [
+        'target_amount' => 'decimal:2',
+        'contribution_amount' => 'decimal:2',
+    ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (Group $group): void {
+            if ($group->invite_code) {
+                return;
+            }
+
+            do {
+                $code = Str::upper(Str::random(6));
+            } while (Group::query()->where('invite_code', $code)->exists());
+
+            $group->invite_code = $code;
+        });
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function members(): HasMany
+>>>>>>> 5916f9f (feat: group routes, promote endpoint, show payload, and schema updates)
     {
         return $this->hasMany(GroupMember::class);
     }
 
+<<<<<<< HEAD
     public function contributions()
     {
         return $this->hasMany(Contribution::class);
     }
 
     public function cycles()
+=======
+    public function cycles(): HasMany
+>>>>>>> 5916f9f (feat: group routes, promote endpoint, show payload, and schema updates)
     {
         return $this->hasMany(ContributionCycle::class);
     }
 
+<<<<<<< HEAD
     public function loans()
     {
         return $this->hasMany(Loan::class);
@@ -97,5 +136,10 @@ class Group extends Model
         } while (static::where('invite_code', $code)->exists());
 
         return $code;
+=======
+    public function contributions(): HasMany
+    {
+        return $this->hasMany(Contribution::class);
+>>>>>>> 5916f9f (feat: group routes, promote endpoint, show payload, and schema updates)
     }
 }

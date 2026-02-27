@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\GroupController;
+use App\Http\Controllers\GroupInviteController;
+use App\Http\Controllers\GroupMemberController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 <<<<<<< HEAD
@@ -9,6 +12,7 @@ use App\Http\Controllers\ContributionController;
 use App\Http\Controllers\GroupInviteController;
 use App\Http\Controllers\GroupMemberController;
 
+<<<<<<< HEAD
 // LoanController is missing, commenting out to prevent errors
 // use App\Http\Controllers\Api\LoanController;
 // use Illuminate\Support\Facades\Route;
@@ -61,3 +65,16 @@ Route::middleware('auth:sanctum')->group(function() {
 });
 =======
 >>>>>>> 694c252 (updated files)
+=======
+Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
+    return $request->user();
+});
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/groups', [GroupController::class, 'index']);
+    Route::post('/groups', [GroupController::class, 'store']);
+    Route::post('/groups/join', [GroupInviteController::class, 'join']);
+    Route::get('/groups/{id}', [GroupController::class, 'show']);
+    Route::patch('/groups/{group}/members/{member}', [GroupMemberController::class, 'promote']);
+});
+>>>>>>> 5916f9f (feat: group routes, promote endpoint, show payload, and schema updates)

@@ -2,13 +2,21 @@
 
 namespace App\Http\Controllers;
 
+<<<<<<< HEAD
 use Illuminate\Http\Request;
 use App\Models\Group;
 use App\Models\GroupMember;
+=======
+use App\Models\Group;
+use App\Models\GroupMember;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+>>>>>>> 5916f9f (feat: group routes, promote endpoint, show payload, and schema updates)
 use Illuminate\Support\Facades\DB;
 
 class GroupMemberController extends Controller
 {
+<<<<<<< HEAD
     public function index(Group $group)
     {
         // Load all members of the group with user info
@@ -61,10 +69,41 @@ class GroupMemberController extends Controller
                 ->update(['role' => 'member']);
 
             $member->update(['role' => 'admin']);
+=======
+    public function promote(Request $request, Group $group, int $member): JsonResponse
+    {
+        $memberRecord = GroupMember::query()
+            ->where('group_id', $group->id)
+            ->where(function ($query) use ($member) {
+                $query->where('id', $member)
+                    ->orWhere('user_id', $member);
+            })
+            ->firstOrFail();
+
+        $currentUserId = $request->user()->id;
+
+        $requestingMembership = GroupMember::query()
+            ->where('group_id', $group->id)
+            ->where('user_id', $currentUserId)
+            ->first();
+
+        if (! $requestingMembership || $requestingMembership->role !== 'admin') {
+            abort(403, 'Only an admin can promote members.');
+        }
+
+        DB::transaction(function () use ($group, $memberRecord) {
+            GroupMember::query()
+                ->where('group_id', $group->id)
+                ->where('role', 'admin')
+                ->update(['role' => 'member']);
+
+            $memberRecord->update(['role' => 'admin']);
+>>>>>>> 5916f9f (feat: group routes, promote endpoint, show payload, and schema updates)
         });
 
         return response()->json([
             'status' => true,
+<<<<<<< HEAD
             'message' => 'Member promoted to admin successfully',
             'data' => [
                 'group_id' => $group->id,
@@ -112,6 +151,9 @@ class GroupMemberController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Member removed from group'
+=======
+            'message' => 'Member promoted to admin.',
+>>>>>>> 5916f9f (feat: group routes, promote endpoint, show payload, and schema updates)
         ]);
     }
 }

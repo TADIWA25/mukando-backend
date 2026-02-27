@@ -2,14 +2,23 @@
 
 namespace App\Http\Controllers;
 
+<<<<<<< HEAD
 use Illuminate\Http\Request;
 use App\Models\Group;
 use App\Models\GroupMember;
 use App\Models\Contribution;
+=======
+use App\Models\Contribution;
+use App\Models\Group;
+use App\Models\GroupMember;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+>>>>>>> 5916f9f (feat: group routes, promote endpoint, show payload, and schema updates)
 use Illuminate\Support\Facades\DB;
 
 class GroupInviteController extends Controller
 {
+<<<<<<< HEAD
     public function join(Request $request)
     {
         // Validate input
@@ -46,13 +55,41 @@ class GroupInviteController extends Controller
                 'user_id' => $userId,
                 'role' => 'member',
             ]);
+=======
+    public function join(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'invite_code' => ['required', 'string', 'size:6'],
+        ]);
+
+        $group = Group::query()
+            ->where('invite_code', strtoupper($validated['invite_code']))
+            ->firstOrFail();
+
+        $userId = $request->user()->id;
+
+        DB::transaction(function () use ($group, $userId) {
+            GroupMember::query()->firstOrCreate(
+                [
+                    'group_id' => $group->id,
+                    'user_id' => $userId,
+                ],
+                [
+                    'role' => 'member',
+                ]
+            );
+>>>>>>> 5916f9f (feat: group routes, promote endpoint, show payload, and schema updates)
 
             $openCycleIds = $group->cycles()
                 ->where('status', 'open')
                 ->pluck('id');
 
             foreach ($openCycleIds as $cycleId) {
+<<<<<<< HEAD
                 Contribution::firstOrCreate([
+=======
+                Contribution::query()->firstOrCreate([
+>>>>>>> 5916f9f (feat: group routes, promote endpoint, show payload, and schema updates)
                     'group_id' => $group->id,
                     'cycle_id' => $cycleId,
                     'user_id' => $userId,
@@ -63,9 +100,15 @@ class GroupInviteController extends Controller
         });
 
         return response()->json([
+<<<<<<< HEAD
             'status' => 'success',
             'message' => 'You have joined the group!',
             'group' => $group,
         ], 200);
+=======
+            'status' => true,
+            'message' => 'Joined group successfully.',
+        ]);
+>>>>>>> 5916f9f (feat: group routes, promote endpoint, show payload, and schema updates)
     }
 }
