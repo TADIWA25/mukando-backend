@@ -10,10 +10,13 @@ use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
+<<<<<<< HEAD
     public function members() { return $this->hasMany(GroupMember::class); }
     public function groups() { return $this->belongsToMany(Group::class, 'group_members')->withPivot('role')->withTimestamps(); }
     public function contributions() { return $this->hasMany(Contribution::class); }
     public function loans() { return $this->hasMany(Loan::class); }
+=======
+>>>>>>> 694c252 (updated files)
     use HasApiTokens, HasFactory, Notifiable;
 
     /**
@@ -23,7 +26,11 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name',
+<<<<<<< HEAD
         'phone',
+=======
+        'email',
+>>>>>>> 694c252 (updated files)
         'password',
     ];
 
@@ -43,6 +50,7 @@ class User extends Authenticatable
      * @var array<string, string>
      */
     protected $casts = [
+<<<<<<< HEAD
         'password' => 'hashed',
     ];
 
@@ -53,4 +61,9 @@ class User extends Authenticatable
     {
         return 'phone';
     }
+=======
+        'email_verified_at' => 'datetime',
+        'password' => 'hashed',
+    ];
+>>>>>>> 694c252 (updated files)
 }

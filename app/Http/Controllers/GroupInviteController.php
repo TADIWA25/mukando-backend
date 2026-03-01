@@ -2,15 +2,24 @@
 
 namespace App\Http\Controllers;
 
+<<<<<<< HEAD
 use Illuminate\Http\Request;
 use App\Models\Group;
 use App\Models\GroupMember;
 use App\Models\Contribution;
+=======
+use App\Models\Contribution;
+use App\Models\Group;
+use App\Models\GroupMember;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+>>>>>>> 5916f9f (feat: group routes, promote endpoint, show payload, and schema updates)
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class GroupInviteController extends Controller
 {
+<<<<<<< HEAD
     public function show(Request $request, string $code)
     {
         $group = Group::withCount('members')
@@ -37,6 +46,9 @@ class GroupInviteController extends Controller
         ], 200);
     }
 
+=======
+<<<<<<< HEAD
+>>>>>>> 27beaa8b2e9604579d5b2212f09ffa9d626dde41
     public function join(Request $request)
     {
         $validated = $request->validate([
@@ -81,11 +93,36 @@ class GroupInviteController extends Controller
                 'user_id' => $userId,
                 'role' => 'member',
             ]);
+=======
+    public function join(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'invite_code' => ['required', 'string', 'size:6'],
+        ]);
+
+        $group = Group::query()
+            ->where('invite_code', strtoupper($validated['invite_code']))
+            ->firstOrFail();
+
+        $userId = $request->user()->id;
+
+        DB::transaction(function () use ($group, $userId) {
+            GroupMember::query()->firstOrCreate(
+                [
+                    'group_id' => $group->id,
+                    'user_id' => $userId,
+                ],
+                [
+                    'role' => 'member',
+                ]
+            );
+>>>>>>> 5916f9f (feat: group routes, promote endpoint, show payload, and schema updates)
 
             $hasCycleSchema = Schema::hasTable('contribution_cycles')
                 && Schema::hasColumn('contributions', 'cycle_id')
                 && Schema::hasColumn('contributions', 'status');
 
+<<<<<<< HEAD
             if ($hasCycleSchema) {
                 $openCycleIds = $group->cycles()
                     ->where('status', 'open')
@@ -100,6 +137,20 @@ class GroupInviteController extends Controller
                         'status' => 'pending',
                     ]);
                 }
+=======
+            foreach ($openCycleIds as $cycleId) {
+<<<<<<< HEAD
+                Contribution::firstOrCreate([
+=======
+                Contribution::query()->firstOrCreate([
+>>>>>>> 5916f9f (feat: group routes, promote endpoint, show payload, and schema updates)
+                    'group_id' => $group->id,
+                    'cycle_id' => $cycleId,
+                    'user_id' => $userId,
+                ], [
+                    'status' => 'pending',
+                ]);
+>>>>>>> 27beaa8b2e9604579d5b2212f09ffa9d626dde41
             }
 
             return $member;
@@ -107,6 +158,7 @@ class GroupInviteController extends Controller
         $member->load('user');
 
         return response()->json([
+<<<<<<< HEAD
             'status' => 'success',
             'message' => 'You have joined the group!',
             'group' => [
@@ -123,5 +175,10 @@ class GroupInviteController extends Controller
                 'role' => $member->role,
             ],
         ], 200);
+=======
+            'status' => true,
+            'message' => 'Joined group successfully.',
+        ]);
+>>>>>>> 5916f9f (feat: group routes, promote endpoint, show payload, and schema updates)
     }
 }
