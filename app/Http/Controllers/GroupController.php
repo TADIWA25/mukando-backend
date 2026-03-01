@@ -139,7 +139,7 @@ class GroupController extends Controller
             ->first();
 
         $members = GroupMember::query()
-            ->with('user:id,name')
+            ->with('user:id,name,phone')
             ->where('group_id', $group->id)
             ->get();
 
@@ -154,9 +154,12 @@ class GroupController extends Controller
 
         $memberPayload = $members->map(function (GroupMember $member) use ($paidUserIds) {
             return [
+                'id' => $member->id,
                 'user_id' => $member->user_id,
                 'name' => $member->user?->name,
+                'phone' => $member->user?->phone,
                 'role' => $member->role,
+                'joined_at' => optional($member->created_at)->toDateTimeString(),
                 'paid_this_cycle' => $paidUserIds->contains($member->user_id),
             ];
         })->values();

@@ -167,10 +167,7 @@ return [
         App\Providers\AuthServiceProvider::class,
         // App\Providers\BroadcastServiceProvider::class,
         App\Providers\EventServiceProvider::class,
-<<<<<<< HEAD
         App\Providers\Filament\AdminPanelProvider::class,
-=======
->>>>>>> 694c252 (updated files)
         App\Providers\RouteServiceProvider::class,
     ])->toArray(),
 

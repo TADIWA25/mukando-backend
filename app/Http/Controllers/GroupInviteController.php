@@ -2,39 +2,32 @@
 
 namespace App\Http\Controllers;
 
-<<<<<<< HEAD
-use Illuminate\Http\Request;
-use App\Models\Group;
-use App\Models\GroupMember;
-use App\Models\Contribution;
-=======
 use App\Models\Contribution;
 use App\Models\Group;
 use App\Models\GroupMember;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
->>>>>>> 5916f9f (feat: group routes, promote endpoint, show payload, and schema updates)
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class GroupInviteController extends Controller
 {
-<<<<<<< HEAD
-    public function show(Request $request, string $code)
+    public function show(Request $request, string $code): JsonResponse
     {
-        $group = Group::withCount('members')
+        $group = Group::query()
+            ->withCount('members')
             ->where('invite_code', strtoupper($code))
             ->first();
 
-        if (!$group) {
+        if (! $group) {
             return response()->json([
-                'status' => 'error',
-                'message' => 'Invalid invite code'
+                'status' => false,
+                'message' => 'Invalid invite code',
             ], 404);
         }
 
         return response()->json([
-            'status' => 'success',
+            'status' => true,
             'data' => [
                 'id' => $group->id,
                 'name' => $group->name,
@@ -43,39 +36,36 @@ class GroupInviteController extends Controller
                 'frequency' => $group->frequency,
                 'members_count' => $group->members_count,
             ],
-        ], 200);
+        ]);
     }
 
-=======
-<<<<<<< HEAD
->>>>>>> 27beaa8b2e9604579d5b2212f09ffa9d626dde41
-    public function join(Request $request)
+    public function join(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'invite_code' => 'required|string',
+            'invite_code' => ['required', 'string'],
         ]);
 
         $inviteCode = strtoupper(trim($validated['invite_code']));
 
-        $group = Group::where('invite_code', $inviteCode)->first();
-        if (!$group) {
+        $group = Group::query()->where('invite_code', $inviteCode)->first();
+        if (! $group) {
             return response()->json([
-                'status' => 'error',
-                'message' => 'Invalid invite code'
+                'status' => false,
+                'message' => 'Invalid invite code',
             ], 404);
         }
 
         $userId = $request->user()->id;
 
-        // Check if already a member
-        $existing = GroupMember::with('user')
+        $existing = GroupMember::query()
+            ->with('user')
             ->where('group_id', $group->id)
             ->where('user_id', $userId)
             ->first();
 
         if ($existing) {
             return response()->json([
-                'status' => 'error',
+                'status' => false,
                 'message' => 'You are already a member of this group',
                 'member' => [
                     'id' => $existing->id,
@@ -88,26 +78,7 @@ class GroupInviteController extends Controller
         }
 
         $member = DB::transaction(function () use ($group, $userId) {
-            $member = GroupMember::create([
-                'group_id' => $group->id,
-                'user_id' => $userId,
-                'role' => 'member',
-            ]);
-=======
-    public function join(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'invite_code' => ['required', 'string', 'size:6'],
-        ]);
-
-        $group = Group::query()
-            ->where('invite_code', strtoupper($validated['invite_code']))
-            ->firstOrFail();
-
-        $userId = $request->user()->id;
-
-        DB::transaction(function () use ($group, $userId) {
-            GroupMember::query()->firstOrCreate(
+            $member = GroupMember::query()->firstOrCreate(
                 [
                     'group_id' => $group->id,
                     'user_id' => $userId,
@@ -116,50 +87,37 @@ class GroupInviteController extends Controller
                     'role' => 'member',
                 ]
             );
->>>>>>> 5916f9f (feat: group routes, promote endpoint, show payload, and schema updates)
 
             $hasCycleSchema = Schema::hasTable('contribution_cycles')
                 && Schema::hasColumn('contributions', 'cycle_id')
                 && Schema::hasColumn('contributions', 'status');
 
-<<<<<<< HEAD
             if ($hasCycleSchema) {
                 $openCycleIds = $group->cycles()
                     ->where('status', 'open')
                     ->pluck('id');
 
                 foreach ($openCycleIds as $cycleId) {
-                    Contribution::firstOrCreate([
-                        'group_id' => $group->id,
-                        'cycle_id' => $cycleId,
-                        'user_id' => $userId,
-                    ], [
-                        'status' => 'pending',
-                    ]);
+                    Contribution::query()->firstOrCreate(
+                        [
+                            'group_id' => $group->id,
+                            'cycle_id' => $cycleId,
+                            'user_id' => $userId,
+                        ],
+                        [
+                            'status' => 'pending',
+                        ]
+                    );
                 }
-=======
-            foreach ($openCycleIds as $cycleId) {
-<<<<<<< HEAD
-                Contribution::firstOrCreate([
-=======
-                Contribution::query()->firstOrCreate([
->>>>>>> 5916f9f (feat: group routes, promote endpoint, show payload, and schema updates)
-                    'group_id' => $group->id,
-                    'cycle_id' => $cycleId,
-                    'user_id' => $userId,
-                ], [
-                    'status' => 'pending',
-                ]);
->>>>>>> 27beaa8b2e9604579d5b2212f09ffa9d626dde41
             }
 
             return $member;
         });
+
         $member->load('user');
 
         return response()->json([
-<<<<<<< HEAD
-            'status' => 'success',
+            'status' => true,
             'message' => 'You have joined the group!',
             'group' => [
                 'id' => $group->id,
@@ -174,11 +132,6 @@ class GroupInviteController extends Controller
                 'phone' => $member->user?->phone,
                 'role' => $member->role,
             ],
-        ], 200);
-=======
-            'status' => true,
-            'message' => 'Joined group successfully.',
         ]);
->>>>>>> 5916f9f (feat: group routes, promote endpoint, show payload, and schema updates)
     }
 }

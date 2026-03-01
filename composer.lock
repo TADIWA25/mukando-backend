@@ -4,7 +4,6 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-<<<<<<< HEAD
     "content-hash": "ac8f8c70c74fc96775d7725750090350",
     "packages": [
         {
@@ -224,11 +223,6 @@
             "time": "2026-02-23T10:42:23+00:00"
         },
         {
-=======
-    "content-hash": "9c491b8531eec05ba41a11d9276a5749",
-    "packages": [
-        {
->>>>>>> 694c252 (updated files)
             "name": "brick/math",
             "version": "0.12.3",
             "source": {
@@ -358,7 +352,6 @@
             "time": "2023-12-11T17:09:12+00:00"
         },
         {
-<<<<<<< HEAD
             "name": "danharrin/date-format-converter",
             "version": "v0.3.1",
             "source": {
@@ -464,8 +457,6 @@
             "time": "2025-02-21T08:52:11+00:00"
         },
         {
-=======
->>>>>>> 694c252 (updated files)
             "name": "dflydev/dot-access-data",
             "version": "v3.0.3",
             "source": {
@@ -541,7 +532,6 @@
             "time": "2024-07-08T12:26:09+00:00"
         },
         {
-<<<<<<< HEAD
             "name": "doctrine/dbal",
             "version": "3.10.4",
             "source": {
@@ -795,8 +785,6 @@
             "time": "2026-01-29T07:11:08+00:00"
         },
         {
-=======
->>>>>>> 694c252 (updated files)
             "name": "doctrine/inflector",
             "version": "2.1.0",
             "source": {
@@ -1095,7 +1083,6 @@
             "time": "2025-03-06T22:45:56+00:00"
         },
         {
-<<<<<<< HEAD
             "name": "filament/actions",
             "version": "v3.3.49",
             "source": {
@@ -1528,8 +1515,6 @@
             "time": "2026-02-07T21:51:58+00:00"
         },
         {
-=======
->>>>>>> 694c252 (updated files)
             "name": "fruitcake/php-cors",
             "version": "v1.4.0",
             "source": {
@@ -2074,7 +2059,6 @@
             "time": "2025-08-22T14:27:06+00:00"
         },
         {
-<<<<<<< HEAD
             "name": "kirschbaum-development/eloquent-power-joins",
             "version": "4.1.0",
             "source": {
@@ -2138,8 +2122,6 @@
             "time": "2025-02-12T11:14:14+00:00"
         },
         {
-=======
->>>>>>> 694c252 (updated files)
             "name": "laravel/framework",
             "version": "10.50.2",
             "source": {
@@ -2788,7 +2770,6 @@
             "time": "2022-12-11T20:36:23+00:00"
         },
         {
-<<<<<<< HEAD
             "name": "league/csv",
             "version": "9.28.0",
             "source": {
@@ -2880,8 +2861,6 @@
             "time": "2025-12-27T15:18:42+00:00"
         },
         {
-=======
->>>>>>> 694c252 (updated files)
             "name": "league/flysystem",
             "version": "3.31.0",
             "source": {
@@ -3070,7 +3049,6 @@
             "time": "2024-09-21T08:32:55+00:00"
         },
         {
-<<<<<<< HEAD
             "name": "league/uri",
             "version": "7.8.0",
             "source": {
@@ -3396,8 +3374,6 @@
             "time": "2025-07-25T09:04:22+00:00"
         },
         {
-=======
->>>>>>> 694c252 (updated files)
             "name": "monolog/monolog",
             "version": "3.10.0",
             "source": {
@@ -3907,7 +3883,6 @@
             "time": "2024-11-21T10:36:35+00:00"
         },
         {
-<<<<<<< HEAD
             "name": "openspout/openspout",
             "version": "v4.25.0",
             "source": {
@@ -4001,8 +3976,6 @@
             "time": "2024-09-24T09:03:42+00:00"
         },
         {
-=======
->>>>>>> 694c252 (updated files)
             "name": "phpoption/phpoption",
             "version": "1.9.5",
             "source": {
@@ -4078,7 +4051,6 @@
             "time": "2025-12-27T19:41:33+00:00"
         },
         {
-<<<<<<< HEAD
             "name": "psr/cache",
             "version": "3.0.0",
             "source": {
@@ -4128,8 +4100,6 @@
             "time": "2021-02-03T23:26:27+00:00"
         },
         {
-=======
->>>>>>> 694c252 (updated files)
             "name": "psr/clock",
             "version": "1.0.0",
             "source": {
@@ -4819,7 +4789,6 @@
             "time": "2025-12-14T04:43:48+00:00"
         },
         {
-<<<<<<< HEAD
             "name": "ryangjchandler/blade-capture-directive",
             "version": "v1.1.0",
             "source": {
@@ -5077,8 +5046,6 @@
             "time": "2026-02-21T12:49:54+00:00"
         },
         {
-=======
->>>>>>> 694c252 (updated files)
             "name": "symfony/console",
             "version": "v6.4.32",
             "source": {
@@ -5620,7 +5587,6 @@
             "time": "2026-01-26T13:03:48+00:00"
         },
         {
-<<<<<<< HEAD
             "name": "symfony/html-sanitizer",
             "version": "v6.4.28",
             "source": {
@@ -5694,8 +5660,6 @@
             "time": "2025-10-29T09:25:59+00:00"
         },
         {
-=======
->>>>>>> 694c252 (updated files)
             "name": "symfony/http-foundation",
             "version": "v6.4.33",
             "source": {
