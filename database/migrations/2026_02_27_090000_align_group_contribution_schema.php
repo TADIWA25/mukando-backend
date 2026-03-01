@@ -33,12 +33,12 @@ return new class extends Migration
             }
 
             if (DB::getDriverName() === 'mysql') {
-                DB::statement("ALTER TABLE groups MODIFY type ENUM('contribution','rounds','shared') NOT NULL");
-                DB::statement("ALTER TABLE groups MODIFY target_amount DECIMAL(10,2) NOT NULL");
-                DB::statement("ALTER TABLE groups MODIFY contribution_amount DECIMAL(10,2) NOT NULL");
-                DB::statement("ALTER TABLE groups MODIFY frequency ENUM('daily','weekly','monthly') NOT NULL");
-                DB::statement("ALTER TABLE groups MODIFY status ENUM('active','completed','cancelled') NOT NULL DEFAULT 'active'");
-                DB::statement("ALTER TABLE groups MODIFY invite_code VARCHAR(6) NOT NULL");
+                DB::statement("ALTER TABLE `groups` MODIFY COLUMN `type` ENUM('contribution','rounds','shared') NOT NULL");
+                DB::statement("ALTER TABLE `groups` MODIFY COLUMN `target_amount` DECIMAL(10,2) NOT NULL");
+                DB::statement("ALTER TABLE `groups` MODIFY COLUMN `contribution_amount` DECIMAL(10,2) NOT NULL");
+                DB::statement("ALTER TABLE `groups` MODIFY COLUMN `frequency` ENUM('daily','weekly','monthly') NOT NULL");
+                DB::statement("ALTER TABLE `groups` MODIFY COLUMN `status` ENUM('active','completed','cancelled') NOT NULL DEFAULT 'active'");
+                DB::statement("ALTER TABLE `groups` MODIFY COLUMN `invite_code` VARCHAR(6) NOT NULL");
             }
         }
 
@@ -83,11 +83,11 @@ return new class extends Migration
             });
 
             if (DB::getDriverName() === 'mysql') {
-                DB::statement("UPDATE contributions SET amount_paid = amount WHERE amount_paid IS NULL");
-                DB::statement("ALTER TABLE contributions MODIFY paid_at TIMESTAMP NULL");
+                DB::statement("UPDATE `contributions` SET `amount_paid` = `amount` WHERE `amount_paid` IS NULL");
+                DB::statement("ALTER TABLE `contributions` MODIFY COLUMN `paid_at` TIMESTAMP NULL");
 
                 if (Schema::hasColumn('contributions', 'amount')) {
-                    DB::statement("ALTER TABLE contributions DROP COLUMN amount");
+                    DB::statement("ALTER TABLE `contributions` DROP COLUMN `amount`");
                 }
             }
         }

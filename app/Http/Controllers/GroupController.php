@@ -55,7 +55,7 @@ class GroupController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'type' => ['required', 'in:contribution,rounds,shared'],
-            'target_amount' => ['required', 'numeric', 'gt:0'],
+            'target_amount' => ['required_if:type,contribution', 'numeric', 'gt:0'],
             'contribution_amount' => ['required', 'numeric', 'gt:0'],
             'frequency' => ['required', 'in:daily,weekly,monthly'],
             'status' => ['sometimes', 'in:active,completed,cancelled'],
@@ -65,10 +65,15 @@ class GroupController extends Controller
         $userId = $request->user()->id;
 
         $group = DB::transaction(function () use ($validated, $userId) {
+            $targetAmount = $validated['target_amount'] ?? null;
+            if ($validated['type'] === 'rounds' && $targetAmount === null) {
+                $targetAmount = (float) $validated['contribution_amount'];
+            }
+
             $group = Group::query()->create([
                 'name' => $validated['name'],
                 'type' => $validated['type'],
-                'target_amount' => $validated['target_amount'],
+                'target_amount' => $targetAmount,
                 'contribution_amount' => $validated['contribution_amount'],
                 'frequency' => $validated['frequency'],
                 'status' => $validated['status'] ?? 'active',

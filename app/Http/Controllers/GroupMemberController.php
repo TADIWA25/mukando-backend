@@ -6,7 +6,6 @@ use App\Models\Group;
 use App\Models\GroupMember;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class GroupMemberController extends Controller
 {
@@ -53,14 +52,14 @@ class GroupMemberController extends Controller
             abort(403, 'Only group admins can promote members.');
         }
 
-        DB::transaction(function () use ($group, $memberRecord) {
-            GroupMember::query()
-                ->where('group_id', $group->id)
-                ->where('role', 'admin')
-                ->update(['role' => 'member']);
+        if ($memberRecord->user_id === $request->user()->id) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Admins cannot change their own role.',
+            ], 400);
+        }
 
-            $memberRecord->update(['role' => 'admin']);
-        });
+        $memberRecord->update(['role' => 'admin']);
 
         return response()->json([
             'status' => true,

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Contribution;
+use App\Models\GroupMember;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,6 +24,18 @@ class ContributionController extends Controller
             'cycle_id' => ['required', 'exists:contribution_cycles,id'],
             'amount' => ['required', 'numeric', 'min:0'],
         ]);
+
+        $isAdmin = GroupMember::query()
+            ->where('group_id', $validated['group_id'])
+            ->where('user_id', $request->user()->id)
+            ->where('role', 'admin')
+            ->exists();
+
+        if (! $isAdmin) {
+            return response()->json([
+                'message' => 'Only group admins can record payments.',
+            ], Response::HTTP_FORBIDDEN);
+        }
 
         $alreadyPaid = Contribution::query()
             ->where('user_id', $validated['user_id'])

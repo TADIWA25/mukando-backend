@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Contribution;
 use App\Models\Group;
 use App\Models\GroupMember;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -91,6 +92,40 @@ class GroupInviteController extends Controller
             $hasCycleSchema = Schema::hasTable('contribution_cycles')
                 && Schema::hasColumn('contributions', 'cycle_id')
                 && Schema::hasColumn('contributions', 'status');
+
+            if ($group->type === 'rounds') {
+                $memberCount = GroupMember::query()
+                    ->where('group_id', $group->id)
+                    ->count();
+
+                $group->update([
+                    'target_amount' => $group->contribution_amount * $memberCount,
+                ]);
+
+                if ($hasCycleSchema) {
+                    $lastCycle = $group->cycles()
+                        ->orderByDesc('cycle_number')
+                        ->first();
+
+                    $nextCycleNumber = $lastCycle ? $lastCycle->cycle_number + 1 : 1;
+                    $baseDate = $lastCycle
+                        ? Carbon::parse($lastCycle->due_date)->startOfDay()
+                        : Carbon::today();
+
+                    $nextDueDate = match ($group->frequency) {
+                        'daily' => $baseDate->copy()->addDay(),
+                        'weekly' => $baseDate->copy()->addWeek(),
+                        'monthly' => $baseDate->copy()->addMonth(),
+                        default => $baseDate->copy(),
+                    };
+
+                    $group->cycles()->create([
+                        'cycle_number' => $nextCycleNumber,
+                        'due_date' => $nextDueDate->toDateString(),
+                        'status' => 'open',
+                    ]);
+                }
+            }
 
             if ($hasCycleSchema) {
                 $openCycleIds = $group->cycles()
