@@ -37,6 +37,7 @@ Route::middleware('auth:sanctum')->group(function() {
     // Groups
     Route::get('/groups', [GroupController::class,'index']);
     Route::post('/groups', [GroupController::class,'store']);
+    Route::get('/groups/invite/{code}', [GroupInviteController::class, 'show']);
     Route::post('/groups/join', [GroupInviteController::class, 'join']);
     Route::get('/groups/{id}', [GroupController::class,'show']);
     Route::get('/groups/{group}/members', [GroupMemberController::class, 'index']);

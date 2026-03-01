@@ -2,19 +2,35 @@
 
 namespace App\Filament\Resources\GroupResource\RelationManagers;
 
+use App\Models\Group;
 use App\Models\GroupMember;
 use Filament\Forms;
+use Filament\Notifications\Notification;
 use Filament\Tables;
 use Filament\Resources\RelationManagers\RelationManager;
+use Illuminate\Support\Str;
 
 class GroupMembersRelationManager extends RelationManager
 {
     protected static string $relationship = 'members';
     protected static ?string $recordTitleAttribute = 'user.name';
+    protected static function generateInviteCode(): string
+    {
+        do {
+            $code = Str::upper(Str::random(6));
+        } while (Group::where('invite_code', $code)->exists());
+
+        return $code;
+    }
 
     public function table(Tables\Table $table): Tables\Table
     {
         return $table
+            ->header(function (RelationManager $livewire) {
+                return view('filament.tables.group-members-header', [
+                    'inviteCode' => $livewire->getOwnerRecord()->invite_code,
+                ]);
+            })
             ->columns([
                 // Member Name
                 Tables\Columns\TextColumn::make('user.name')
@@ -99,7 +115,23 @@ class GroupMembersRelationManager extends RelationManager
                 Tables\Columns\TextColumn::make('updated_at')->dateTime()->toggleable(isToggledHiddenByDefault: true),
             ])
             ->headerActions([
-                Tables\Actions\CreateAction::make(),
+                Tables\Actions\Action::make('generateInviteCode')
+                    ->label('Generate Code')
+                    ->icon('heroicon-o-key')
+                    ->action(function (RelationManager $livewire): void {
+                        $group = $livewire->getOwnerRecord();
+
+                        if (empty($group->invite_code)) {
+                            $group->invite_code = static::generateInviteCode();
+                            $group->save();
+                        }
+
+                        Notification::make()
+                            ->title('Invitation Code')
+                            ->body($group->invite_code)
+                            ->success()
+                            ->send();
+                    }),
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),

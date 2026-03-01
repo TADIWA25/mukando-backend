@@ -83,7 +83,10 @@ class GroupController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Group created successfully',
-            'data' => $group->load('members.user'),
+            'data' => array_merge(
+                $group->load('members.user')->toArray(),
+                ['invite_code' => $group->invite_code]
+            ),
         ], 201);
     }
 
