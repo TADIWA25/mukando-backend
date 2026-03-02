@@ -55,7 +55,9 @@ class GroupController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'type' => ['required', 'in:contribution,rounds,shared'],
-            'target_amount' => ['required_if:type,contribution', 'numeric', 'gt:0'],
+            // `target_amount` applies only to contribution groups.
+            // Exclude it for other types so payloads like target_amount=0 do not fail validation.
+            'target_amount' => ['exclude_unless:type,contribution', 'required', 'numeric', 'gt:0'],
             'contribution_amount' => ['required', 'numeric', 'gt:0'],
             'frequency' => ['required', 'in:daily,weekly,monthly'],
             'status' => ['sometimes', 'in:active,completed,cancelled'],
