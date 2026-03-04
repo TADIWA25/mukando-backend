@@ -1,4 +1,3 @@
-
 <?php
 
 use Illuminate\Database\Migrations\Migration;
@@ -15,10 +14,12 @@ return new class extends Migration
         Schema::create('groups', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->enum('type', ['contribution','rounds','shared']);
-            $table->decimal('contribution_amount', 10, 2)->nullable();
-            $table->enum('frequency', ['weekly','monthly','bi-monthly','yearly'])->nullable();
-            $table->decimal('interest_rate', 5, 2)->nullable();
+            $table->enum('type', ['contribution', 'rounds', 'shared']);
+            $table->decimal('target_amount', 10, 2);
+            $table->decimal('contribution_amount', 10, 2);
+            $table->enum('frequency', ['daily', 'weekly', 'monthly']);
+            $table->enum('status', ['active', 'completed', 'cancelled'])->default('active');
+            $table->string('invite_code', 6)->unique();
             $table->foreignId('created_by')->constrained('users');
             $table->timestamps();
         });

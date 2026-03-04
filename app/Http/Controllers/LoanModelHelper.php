@@ -10,7 +10,7 @@ class Loan extends Model
     use HasFactory;
 
     protected $fillable = [
-        'user_id', 'group_id', 'amount', 'interest', 'total_amount', 'due_date', 'status'
+        'user_id', 'group_id', 'amount', 'interest', 'total_amount', 'due_date', 'status',
     ];
 
     // Call this when creating a loan

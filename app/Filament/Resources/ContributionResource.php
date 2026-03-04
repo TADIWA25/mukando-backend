@@ -3,17 +3,14 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ContributionResource\Pages;
-use App\Filament\Resources\ContributionResource\RelationManagers;
 use App\Models\Contribution;
 use Filament\Forms;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 
 class ContributionResource extends Resource
 {
@@ -22,89 +19,102 @@ class ContributionResource extends Resource
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
 
     public static function form(Form $form): Form
-{
-    return $form->schema([
-        // 1️⃣ Select Group
-        Select::make('group_id')
-            ->label('Group')
-            ->options(\App\Models\Group::pluck('name', 'id')) // id => name
-            ->reactive() // triggers updates on dependent fields
-            ->required(),
+    {
+        return $form->schema([
+            Forms\Components\Section::make('Contribution Information')
+                ->schema([
 
-        // 2️⃣ Select User based on group
-        Select::make('user_id')
-            ->label('Member')
-            ->options(function (callable $get) {
-                $groupId = $get('group_id');
-                if (!$groupId) return [];
+                    // 1️⃣ Select Group
+                    Select::make('group_id')
+                        ->label('Group')
+                        ->options(\App\Models\Group::pluck('name', 'id'))
+                        ->reactive()
+                        ->afterStateUpdated(function ($state, callable $set) {
+                            if ($state) {
+                                $group = \App\Models\Group::find($state);
+                                if ($group) {
+                                    $set('amount_paid', $group->contribution_amount);
+                                }
+                            } else {
+                                $set('amount_paid', null);
+                            }
+                        })
+                        ->required(),
 
-                // Get users in the selected group
-                return \App\Models\GroupMember::where('group_id', $groupId)
-                    ->with('user')
-                    ->get()
-                    ->pluck('user.name', 'user.id');
-            })
-            ->searchable() // enables search by name
-            ->required(),
+                    // 2️⃣ Select User based on group
+                    Select::make('user_id')
+                        ->label('Member')
+                        ->options(function (callable $get) {
+                            $groupId = $get('group_id');
 
-        // 3️⃣ Contribution amount
-        TextInput::make('amount')
-            ->numeric()
-            ->default(fn(callable $get) => optional(\App\Models\Group::find($get('group_id')))->contribution_amount)
-            ->required()
-            ->minValue(0)
-            ->maxValue(fn(callable $get) => optional(\App\Models\Group::find($get('group_id')))->contribution_amount),
+                            if (! $groupId) {
+                                return [];
+                            }
 
-        // 4️⃣ Paid at
-        TextInput::make('paid_at')
-            ->type('datetime-local')
-            ->required(),
-    ]);
-}
+                            return \App\Models\GroupMember::where('group_id', $groupId)
+                                ->with('user')
+                                ->get()
+                                ->pluck('user.name', 'user.id');
+                        })
+                        ->searchable()
+                        ->required()
+                        ->unique(
+                            table: 'contributions',
+                            column: 'user_id',
+                            modifyRuleUsing: function (\Illuminate\Validation\Rules\Unique $rule, callable $get) {
+                                return $rule->where('group_id', $get('group_id')); // ✅ FIXED
+                            },
+                            ignoreRecord: true
+                        )
+                        ->validationMessages([
+                            'unique' => 'This member already has a contribution record for this group.',
+                        ])
+                        ->helperText('A member can only have one contribution record per group.'),
+
+                    // 3️⃣ Contribution amount
+                    TextInput::make('amount_paid')
+                        ->numeric()
+                        ->required()
+                        ->minValue(0),
+
+                    // 4️⃣ Paid at
+                    Forms\Components\DateTimePicker::make('paid_at')
+                        ->default(now())
+                        ->required(),
+
+                ])->columns(2),
+        ]);
+    }
 
     public static function table(Table $table): Table
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('user_id')
-                    ->numeric()
+                Tables\Columns\TextColumn::make('user.name')
+                    ->label('Member Name')
+                    ->sortable()
+                    ->searchable(),
+
+                Tables\Columns\TextColumn::make('amount_paid')
+                    ->label('Amount Paid')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('group_id')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('amount')
-                    ->numeric()
-                    ->sortable(),
+
                 Tables\Columns\TextColumn::make('paid_at')
+                    ->label('Date')
                     ->dateTime()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-            ])
-            ->filters([
-                //
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                ]),
+                Tables\Actions\DeleteBulkAction::make(),
             ]);
     }
 
     public static function getRelations(): array
     {
-        return [
-            //
-        ];
+        return [];
     }
 
     public static function getPages(): array

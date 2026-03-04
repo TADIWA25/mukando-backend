@@ -11,15 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('contribution_cycles', function (Blueprint $table) {
+        Schema::create('overdues', function (Blueprint $table) {
             $table->id();
             $table->foreignId('group_id')->constrained('groups')->cascadeOnDelete();
-            $table->integer('cycle_number');
-            $table->date('due_date');
-            $table->enum('status', ['open', 'closed'])->default('open');
+            $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignId('cycle_id')->nullable()->constrained('contribution_cycles')->cascadeOnDelete();
+            $table->decimal('amount', 10, 2);
+            $table->enum('status', ['pending', 'paid'])->default('pending');
             $table->timestamps();
-
-            $table->unique(['group_id', 'cycle_number']);
         });
     }
 
@@ -28,6 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('contribution_cycles');
+        Schema::dropIfExists('overdues');
     }
 };

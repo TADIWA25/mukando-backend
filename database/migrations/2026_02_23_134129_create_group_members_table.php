@@ -11,13 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-       Schema::create('group_members', function (Blueprint $table) {
-    $table->id();
-    $table->foreignId('user_id')->constrained('users');
-    $table->foreignId('group_id')->constrained('groups');
-    $table->enum('role', ['admin','member'])->default('member');
-    $table->timestamps();
-});
+        Schema::create('group_members', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('group_id')->constrained('groups')->cascadeOnDelete();
+            $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
+            $table->enum('role', ['admin', 'member'])->default('member');
+            $table->timestamps();
+
+            $table->unique(['group_id', 'user_id']);
+        });
     }
 
     /**

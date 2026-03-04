@@ -11,8 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('groups', function (Blueprint $table) {
-            $table->string('invite_code')->nullable()->after('name')->unique();
+        Schema::table('loan_applications', function (Blueprint $table) {
+            $table->unsignedTinyInteger('duration_months')->default(1)->after('amount');
         });
     }
 
@@ -21,8 +21,9 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('groups', function (Blueprint $table) {
-            
+        Schema::table('loan_applications', function (Blueprint $table) {
+            $table->dropColumn('duration_months');
         });
     }
 };
+

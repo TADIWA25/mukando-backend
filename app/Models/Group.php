@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -19,6 +20,8 @@ class Group extends Model
         'contribution_amount',
         'frequency',
         'status',
+        'total_collected',
+        'interest_rate',
         'invite_code',
         'created_by',
     ];
@@ -55,14 +58,14 @@ class Group extends Model
         return $this->hasMany(GroupMember::class);
     }
 
-    public function cycles(): HasMany
-    {
-        return $this->hasMany(ContributionCycle::class);
-    }
-
     public function contributions(): HasMany
     {
         return $this->hasMany(Contribution::class);
+    }
+
+    public function overdues(): HasMany
+    {
+        return $this->hasMany(Overdue::class);
     }
 
     public function loans(): HasMany

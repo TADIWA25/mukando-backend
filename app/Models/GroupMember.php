@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class GroupMember extends Model
 {
@@ -14,6 +15,9 @@ class GroupMember extends Model
         'group_id',
         'user_id',
         'role',
+        'has_paid',
+        'amount_paid',
+        'last_payment_at',
     ];
 
     public function group(): BelongsTo
@@ -24,5 +28,15 @@ class GroupMember extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function contributions(): HasMany
+    {
+        return $this->hasMany(Contribution::class, 'user_id', 'user_id');
+    }
+
+    public function loans(): HasMany
+    {
+        return $this->hasMany(Loan::class, 'user_id', 'user_id');
     }
 }

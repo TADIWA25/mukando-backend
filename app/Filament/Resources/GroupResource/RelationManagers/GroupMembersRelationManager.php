@@ -3,17 +3,18 @@
 namespace App\Filament\Resources\GroupResource\RelationManagers;
 
 use App\Models\Group;
-use App\Models\GroupMember;
 use Filament\Forms;
 use Filament\Notifications\Notification;
-use Filament\Tables;
 use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Tables;
 use Illuminate\Support\Str;
 
 class GroupMembersRelationManager extends RelationManager
 {
     protected static string $relationship = 'members';
+
     protected static ?string $recordTitleAttribute = 'user.name';
+
     protected static function generateInviteCode(): string
     {
         do {
@@ -49,17 +50,14 @@ class GroupMembersRelationManager extends RelationManager
                         $group = $record->group;
                         $user = $record->user;
 
-                        // Sum contributions for current period
+                        // Dynamic calculation based on total contributions vs expected amount
                         $totalPaid = $user->contributions()
                             ->where('group_id', $group->id)
-                            ->whereBetween('paid_at', [$group->currentPeriodStart(), $group->currentPeriodEnd()])
-                            ->sum('amount');
+                            ->sum('amount_paid');
 
-                        $amountOwing = $group->contribution_amount - $totalPaid;
-
-                        return $amountOwing <= 0
-                            ? "Paid: " . number_format($group->contribution_amount, 2)
-                            : "Amount Owing: " . number_format($amountOwing, 2);
+                        return $totalPaid >= $group->contribution_amount
+                            ? 'Paid: '.number_format($totalPaid, 2)
+                            : 'Amount Owing: '.number_format($group->contribution_amount - $totalPaid, 2);
                     })
                     ->color(function ($record) {
                         $group = $record->group;
@@ -67,10 +65,19 @@ class GroupMembersRelationManager extends RelationManager
 
                         $totalPaid = $user->contributions()
                             ->where('group_id', $group->id)
-                            ->whereBetween('paid_at', [$group->currentPeriodStart(), $group->currentPeriodEnd()])
-                            ->sum('amount');
+                            ->sum('amount_paid');
 
                         return $totalPaid >= $group->contribution_amount ? 'success' : 'danger';
+                    })
+                    ->icon(function ($record) {
+                        $group = $record->group;
+                        $user = $record->user;
+
+                        $totalPaid = $user->contributions()
+                            ->where('group_id', $group->id)
+                            ->sum('amount_paid');
+
+                        return $totalPaid >= $group->contribution_amount ? 'heroicon-m-check-circle' : 'heroicon-m-x-circle';
                     }),
 
                 // Loan Owing
@@ -82,16 +89,18 @@ class GroupMembersRelationManager extends RelationManager
 
                         $loan = $user->loans()
                             ->where('group_id', $group->id)
-                            ->whereIn('status', ['pending','approved'])
+                            ->whereIn('status', ['pending', 'approved'])
                             ->latest()
                             ->first();
 
-                        if (!$loan) return 'No Loan';
+                        if (! $loan) {
+                            return 'No Loan';
+                        }
 
                         $paid = $loan->payments()->sum('amount');
                         $remaining = $loan->total_amount - $paid;
 
-                        return 'Owing: ' . number_format($remaining, 2);
+                        return 'Owing: '.number_format($remaining, 2);
                     })
                     ->color(function ($record) {
                         $user = $record->user;
@@ -99,11 +108,13 @@ class GroupMembersRelationManager extends RelationManager
 
                         $loan = $user->loans()
                             ->where('group_id', $group->id)
-                            ->whereIn('status', ['pending','approved'])
+                            ->whereIn('status', ['pending', 'approved'])
                             ->latest()
                             ->first();
 
-                        if (!$loan) return 'success';
+                        if (! $loan) {
+                            return 'success';
+                        }
 
                         $paid = $loan->payments()->sum('amount');
                         $remaining = $loan->total_amount - $paid;

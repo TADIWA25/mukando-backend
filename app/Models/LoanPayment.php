@@ -8,7 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 class LoanPayment extends Model
 {
     use HasFactory;
-     protected $fillable = [
+
+    protected $fillable = [
         'loan_id',
         'amount',
         'paid_at',

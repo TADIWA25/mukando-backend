@@ -11,14 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-       Schema::create('contributions', function (Blueprint $table) {
-    $table->id();
-    $table->foreignId('user_id')->constrained('users');
-    $table->foreignId('group_id')->constrained('groups');
-    $table->decimal('amount', 10, 2);
-    $table->dateTime('paid_at');
-    $table->timestamps();
-});
+        Schema::table('overdues', function (Blueprint $table) {
+            $table->unique(['group_id', 'user_id', 'due_date'], 'overdues_group_user_due_date_unique');
+        });
     }
 
     /**
@@ -26,6 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('contributions');
+        Schema::table('overdues', function (Blueprint $table) {
+            $table->dropUnique('overdues_group_user_due_date_unique');
+        });
     }
 };

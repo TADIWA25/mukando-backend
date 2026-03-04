@@ -12,7 +12,6 @@ class Contribution extends Model
 
     protected $fillable = [
         'group_id',
-        'cycle_id',
         'user_id',
         'amount_paid',
         'status',
@@ -28,11 +27,6 @@ class Contribution extends Model
     public function group(): BelongsTo
     {
         return $this->belongsTo(Group::class);
-    }
-
-    public function cycle(): BelongsTo
-    {
-        return $this->belongsTo(ContributionCycle::class, 'cycle_id');
     }
 
     public function user(): BelongsTo

@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('groups', function (Blueprint $table) {
-             $table->decimal('total_collected', 10, 2)->default(0);
+            $table->decimal('total_collected', 10, 2)->default(0)->after('contribution_amount');
         });
     }
 
@@ -22,9 +22,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('groups', function (Blueprint $table) {
-        $table->dropColumn('total_collected');
+            $table->dropColumn('total_collected');
         });
     }
-   
-
 };

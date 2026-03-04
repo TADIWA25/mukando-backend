@@ -3,14 +3,14 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\LoanResource\Pages;
-use App\Models\Loan;
 use App\Models\Group;
-use App\Models\User;
+use App\Models\Loan;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class LoanResource extends Resource
 {
@@ -25,7 +25,7 @@ class LoanResource extends Resource
                 // Group Dropdown - Only Shared Funds
                 Forms\Components\Select::make('group_id')
                     ->label('Shared Fund Group')
-                    ->options(Group::where('type', 'shared')->pluck('name','id'))
+                    ->options(Group::where('type', 'shared')->pluck('name', 'id'))
                     ->required()
                     ->reactive()
                     ->afterStateUpdated(function ($state, callable $set, callable $get) {
@@ -33,7 +33,7 @@ class LoanResource extends Resource
                         if ($group) {
                             $interest = $group->interest_rate ?? 0;
                             $set('interest', $interest);
-                            
+
                             $amount = $get('amount') ?? 0;
                             $set('total_amount', $amount + ($amount * $interest / 100));
                         }
@@ -44,7 +44,10 @@ class LoanResource extends Resource
                     ->label('Member')
                     ->options(function (callable $get) {
                         $groupId = $get('group_id');
-                        if (!$groupId) return [];
+                        if (! $groupId) {
+                            return [];
+                        }
+
                         return \App\Models\GroupMember::where('group_id', $groupId)
                             ->with('user')
                             ->get()
@@ -59,10 +62,31 @@ class LoanResource extends Resource
                     ->numeric()
                     ->required()
                     ->minValue(1)
+                    ->maxValue(function (callable $get) {
+                        $groupId = $get('group_id');
+                        if (! $groupId) {
+                            return null;
+                        }
+
+                        return (float) (Group::find($groupId)?->contribution_amount ?? 0);
+                    })
                     ->reactive()
                     ->afterStateUpdated(function ($state, callable $set, callable $get) {
                         $interest = $get('interest') ?? 0;
                         $set('total_amount', $state + ($state * $interest / 100));
+                    })
+                    ->helperText(function (callable $get) {
+                        $groupId = $get('group_id');
+                        if (! $groupId) {
+                            return 'Select a group first to apply borrowing limit.';
+                        }
+
+                        $max = Group::find($groupId)?->contribution_amount;
+                        if ($max === null) {
+                            return null;
+                        }
+
+                        return 'Maximum loan amount for this group: $'.number_format((float) $max, 2);
                     }),
 
                 // Interest (auto from group)
@@ -82,6 +106,7 @@ class LoanResource extends Resource
                     ->default(function (callable $get) {
                         $amount = $get('amount') ?? 0;
                         $interest = optional(Group::find($get('group_id')))->interest_rate ?? 0;
+
                         return $amount + ($amount * $interest / 100);
                     }),
 
@@ -123,6 +148,11 @@ class LoanResource extends Resource
             ->bulkActions([
                 Tables\Actions\DeleteBulkAction::make(),
             ]);
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->where('status', '!=', 'paid');
     }
 
     public static function getPages(): array

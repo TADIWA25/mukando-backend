@@ -2,7 +2,6 @@
 
 namespace App\Filament\Pages\Auth;
 
-use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Filament\Forms\Components\Component;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
@@ -37,11 +36,11 @@ class Login extends BaseLogin
         $phone = preg_replace('/\D/', '', $data['email']);
 
         if (str_starts_with($phone, '0')) {
-            $phone = '263' . substr($phone, 1);
+            $phone = '263'.substr($phone, 1);
         }
 
         return [
-            'phone'    => $phone,
+            'phone' => $phone,
             'password' => $data['password'],
         ];
     }

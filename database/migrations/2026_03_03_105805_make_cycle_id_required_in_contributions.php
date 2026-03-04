@@ -11,12 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('loan_payments', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('loan_id')->constrained('loans');
-            $table->decimal('amount', 10, 2);
-            $table->dateTime('paid_at');
-            $table->timestamps();
+        Schema::table('contributions', function (Blueprint $table) {
+            //
         });
     }
 
@@ -25,6 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('loan_payments');
+        Schema::table('contributions', function (Blueprint $table) {
+            //
+        });
     }
 };

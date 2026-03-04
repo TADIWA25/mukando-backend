@@ -6,9 +6,11 @@ use App\Models\Contribution;
 use App\Models\Group;
 use App\Models\GroupMember;
 use Carbon\Carbon;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\Response;
 
 class GroupController extends Controller
 {
@@ -26,9 +28,50 @@ class GroupController extends Controller
             ->latest()
             ->get();
 
-        $data = $groups->map(function (Group $group) use ($memberships) {
+        // preload all member and contribution data for the groups in a single query set
+        $groupIds = $groups->pluck('id')->all();
+
+        $allMembers = GroupMember::query()
+            ->with('user:id,name,phone')
+            ->whereIn('group_id', $groupIds)
+            ->get()
+            ->groupBy('group_id');
+
+        $data = $groups->map(function (Group $group) use ($memberships, $userId, $allMembers) {
             $membership = $memberships->get($group->id);
             $isAdmin = $membership?->role === 'admin';
+
+            // ignore cycles entirely when collecting contributions; grab any record for the group
+            $contributions = Contribution::query()
+                ->where('group_id', $group->id)
+                ->get()
+                ->groupBy('user_id')
+                ->mapWithKeys(fn ($grouped, $userId) => [$userId => $grouped->first()]);
+
+            $members = $allMembers->get($group->id, collect());
+
+            $memberPayload = $members->map(function (GroupMember $member) use ($contributions) {
+                $contribution = $contributions->get($member->user_id);
+                // determine status based on amount_paid rather than stored status if present
+                $status = 'pending';
+                if ($contribution) {
+                    $status = (float) $contribution->amount_paid > 0 ? 'paid' : $contribution->status;
+                }
+
+                return [
+                    'id' => $member->id,
+                    'user_id' => $member->user_id,
+                    'name' => $member->user?->name,
+                    'phone' => $member->user?->phone,
+                    'role' => $member->role,
+                    'joined_at' => optional($member->created_at)->toDateTimeString(),
+                    'contribution_status' => $status,
+                    'paid_this_cycle' => $status === 'paid',
+                    'contribution_amount' => $contribution
+                        ? (float) $contribution->amount_paid
+                        : 0,
+                ];
+            })->values();
 
             return [
                 'id' => $group->id,
@@ -36,11 +79,15 @@ class GroupController extends Controller
                 'type' => $group->type,
                 'target_amount' => number_format((float) $group->target_amount, 2, '.', ''),
                 'contribution_amount' => number_format((float) $group->contribution_amount, 2, '.', ''),
+                'interest_rate' => number_format((float) $group->interest_rate, 2, '.', ''),
                 'frequency' => $group->frequency,
                 'status' => $group->status,
+                'total_collected' => number_format((float) $group->total_collected, 2, '.', ''),
                 'role' => $membership?->role,
+                'contribution_status' => $contributions->get($userId)?->status ?? 'pending',
                 'invite_code' => $group->invite_code,
                 'can_invite' => $isAdmin,
+                'members' => $memberPayload,
             ];
         })->values();
 
@@ -57,6 +104,7 @@ class GroupController extends Controller
             'type' => ['required', 'in:contribution,rounds,shared'],
             'target_amount' => ['required', 'numeric', 'gt:0'],
             'contribution_amount' => ['required', 'numeric', 'gt:0'],
+            'interest_rate' => ['nullable', 'numeric', 'min:0'],
             'frequency' => ['required', 'in:daily,weekly,monthly'],
             'status' => ['sometimes', 'in:active,completed,cancelled'],
             'start_date' => ['required', 'date'],
@@ -64,47 +112,42 @@ class GroupController extends Controller
 
         $userId = $request->user()->id;
 
-        $group = DB::transaction(function () use ($validated, $userId) {
-            $group = Group::query()->create([
-                'name' => $validated['name'],
-                'type' => $validated['type'],
-                'target_amount' => $validated['target_amount'],
-                'contribution_amount' => $validated['contribution_amount'],
-                'frequency' => $validated['frequency'],
-                'status' => $validated['status'] ?? 'active',
-                'created_by' => $userId,
-            ]);
+        try {
+            $group = DB::transaction(function () use ($validated, $userId) {
+                $group = Group::query()->create([
+                    'name' => $validated['name'],
+                    'type' => $validated['type'],
+                    'target_amount' => $validated['target_amount'],
+                    'contribution_amount' => $validated['contribution_amount'],
+                    'interest_rate' => $validated['interest_rate'] ?? 0,
+                    'frequency' => $validated['frequency'],
+                    'status' => $validated['status'] ?? 'active',
+                    'created_by' => $userId,
+                ]);
 
-            GroupMember::query()->create([
-                'group_id' => $group->id,
-                'user_id' => $userId,
-                'role' => 'admin',
-            ]);
-
-            $cycleCount = (int) ceil($group->target_amount / $group->contribution_amount);
-            $cycleCount = max(1, $cycleCount);
-
-            $dueDate = Carbon::parse($validated['start_date'])->startOfDay();
-
-            for ($cycleNumber = 1; $cycleNumber <= $cycleCount; $cycleNumber++) {
-                $cycle = $group->cycles()->create([
-                    'cycle_number' => $cycleNumber,
-                    'due_date' => $dueDate->toDateString(),
-                    'status' => 'open',
+                GroupMember::query()->create([
+                    'group_id' => $group->id,
+                    'user_id' => $userId,
+                    'role' => 'admin',
                 ]);
 
                 Contribution::query()->create([
                     'group_id' => $group->id,
-                    'cycle_id' => $cycle->id,
                     'user_id' => $userId,
                     'status' => 'pending',
                 ]);
 
-                $dueDate = $this->advanceDateByFrequency($dueDate, $group->frequency);
+                return $group;
+            });
+        } catch (QueryException $e) {
+            if ($e->getCode() === '23000' || (isset($e->errorInfo[1]) && $e->errorInfo[1] === 1062)) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Cannot duplicate a contribution for this member.',
+                ], Response::HTTP_CONFLICT);
             }
-
-            return $group;
-        });
+            throw $e;
+        }
 
         return response()->json([
             'status' => true,
@@ -133,26 +176,25 @@ class GroupController extends Controller
             ->where('status', 'paid')
             ->sum('amount_paid');
 
-        $currentCycle = $group->cycles()
-            ->where('status', 'open')
-            ->orderBy('cycle_number')
-            ->first();
-
+        // ignore cycles when fetching contributions for show
         $members = GroupMember::query()
             ->with('user:id,name,phone')
             ->where('group_id', $group->id)
             ->get();
 
-        $paidUserIds = collect();
-        if ($currentCycle) {
-            $paidUserIds = Contribution::query()
-                ->where('group_id', $group->id)
-                ->where('cycle_id', $currentCycle->id)
-                ->where('status', 'paid')
-                ->pluck('user_id');
-        }
+        $contributions = Contribution::query()
+            ->where('group_id', $group->id)
+            ->get()
+            ->keyBy('user_id');
 
-        $memberPayload = $members->map(function (GroupMember $member) use ($paidUserIds) {
+        $memberPayload = $members->map(function (GroupMember $member) use ($contributions) {
+            $contribution = $contributions->get($member->user_id);
+            // determine status based on amount_paid rather than stored status if present
+            $status = 'pending';
+            if ($contribution) {
+                $status = (float) $contribution->amount_paid > 0 ? 'paid' : $contribution->status;
+            }
+
             return [
                 'id' => $member->id,
                 'user_id' => $member->user_id,
@@ -160,7 +202,11 @@ class GroupController extends Controller
                 'phone' => $member->user?->phone,
                 'role' => $member->role,
                 'joined_at' => optional($member->created_at)->toDateTimeString(),
-                'paid_this_cycle' => $paidUserIds->contains($member->user_id),
+                'contribution_status' => $status,
+                'paid_this_cycle' => $status === 'paid',
+                'contribution_amount' => $contribution
+                    ? (float) $contribution->amount_paid
+                    : 0,
             ];
         })->values();
 
@@ -170,16 +216,12 @@ class GroupController extends Controller
             'type' => $group->type,
             'target_amount' => number_format((float) $group->target_amount, 2, '.', ''),
             'contribution_amount' => number_format((float) $group->contribution_amount, 2, '.', ''),
+            'interest_rate' => number_format((float) $group->interest_rate, 2, '.', ''),
             'frequency' => $group->frequency,
             'status' => $group->status,
+            'total_collected' => number_format((float) $group->total_collected, 2, '.', ''),
             'invite_code' => $isAdmin ? $group->invite_code : null,
             'total_contributed' => number_format((float) $totalContributed, 2, '.', ''),
-            'current_cycle' => $currentCycle ? [
-                'id' => $currentCycle->id,
-                'cycle_number' => $currentCycle->cycle_number,
-                'due_date' => $currentCycle->due_date,
-                'status' => $currentCycle->status,
-            ] : null,
             'members' => $memberPayload,
         ];
 

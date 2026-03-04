@@ -34,6 +34,13 @@ class GroupIndexInviteCodeTest extends TestCase
             'user_id' => $admin->id,
             'role' => 'admin',
         ]);
+        // add a contribution record for admin (pending)
+        \App\Models\Contribution::query()->create([
+            'group_id' => $adminGroup->id,
+            'user_id' => $admin->id,
+            'amount_paid' => 100,
+            'status' => 'paid',
+        ]);
 
         $memberGroup = Group::query()->create([
             'name' => 'Member Group',
@@ -72,6 +79,7 @@ class GroupIndexInviteCodeTest extends TestCase
         $response = $this->getJson('/api/groups');
 
         $response->assertOk();
+        // debug dump removed
         $response->assertJsonCount(2, 'data');
         $response->assertJsonFragment([
             'id' => $adminGroup->id,
@@ -88,5 +96,19 @@ class GroupIndexInviteCodeTest extends TestCase
         $response->assertJsonMissing([
             'id' => $outsiderGroup->id,
         ]);
+
+        // verify member arrays include the new contribution_amount field
+        $groups = collect($response->json('data'));
+        $adminGroupPayload = $groups->firstWhere('id', $adminGroup->id);
+        $memberPayload = collect($adminGroupPayload['members'])->first();
+        $this->assertArrayHasKey('contribution_amount', $memberPayload);
+        // amount should be the 100 from the cycle-specific row; null-cycle row is ignored
+        $this->assertSame(100, $memberPayload['contribution_amount']);
+        $this->assertTrue($memberPayload['paid_this_cycle']);
+
+        $memberGroupPayload = $groups->firstWhere('id', $memberGroup->id);
+        $memberPayload2 = collect($memberGroupPayload['members'])->first();
+        $this->assertArrayHasKey('contribution_amount', $memberPayload2);
+        $this->assertSame(0, $memberPayload2['contribution_amount']);
     }
 }

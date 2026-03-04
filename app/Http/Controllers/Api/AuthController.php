@@ -3,11 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
@@ -25,7 +24,7 @@ class AuthController extends Controller
             return response()->json([
                 'status' => false,
                 'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
@@ -45,7 +44,7 @@ class AuthController extends Controller
             'status' => true,
             'message' => 'User registered successfully',
             'token' => $token,
-            'user' => $user
+            'user' => $user,
         ], 201);
     }
 
@@ -60,7 +59,7 @@ class AuthController extends Controller
             return response()->json([
                 'status' => false,
                 'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
@@ -68,7 +67,7 @@ class AuthController extends Controller
 
         $user = User::where('phone', $phone)->first();
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
+        if (! $user || ! Hash::check($request->password, $user->password)) {
             return response()->json([
                 'status' => false,
                 'message' => 'Invalid credentials',
@@ -81,7 +80,7 @@ class AuthController extends Controller
             'status' => true,
             'message' => 'Login successful',
             'token' => $token,
-            'user' => $user
+            'user' => $user,
         ], 200);
     }
 
@@ -91,7 +90,7 @@ class AuthController extends Controller
 
         return response()->json([
             'status' => true,
-            'message' => 'Logged out successfully'
+            'message' => 'Logged out successfully',
         ], 200);
     }
 
@@ -101,7 +100,7 @@ class AuthController extends Controller
         $phone = preg_replace('/\D/', '', $phone);
 
         if (substr($phone, 0, 1) == '0') {
-            return '263' . substr($phone, 1);
+            return '263'.substr($phone, 1);
         }
 
         if (substr($phone, 0, 3) == '263') {

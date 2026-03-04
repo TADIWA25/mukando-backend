@@ -88,28 +88,15 @@ class GroupInviteController extends Controller
                 ]
             );
 
-            $hasCycleSchema = Schema::hasTable('contribution_cycles')
-                && Schema::hasColumn('contributions', 'cycle_id')
-                && Schema::hasColumn('contributions', 'status');
-
-            if ($hasCycleSchema) {
-                $openCycleIds = $group->cycles()
-                    ->where('status', 'open')
-                    ->pluck('id');
-
-                foreach ($openCycleIds as $cycleId) {
-                    Contribution::query()->firstOrCreate(
-                        [
-                            'group_id' => $group->id,
-                            'cycle_id' => $cycleId,
-                            'user_id' => $userId,
-                        ],
-                        [
-                            'status' => 'pending',
-                        ]
-                    );
-                }
-            }
+            Contribution::query()->firstOrCreate(
+                [
+                    'group_id' => $group->id,
+                    'user_id' => $userId,
+                ],
+                [
+                    'status' => 'pending',
+                ]
+            );
 
             return $member;
         });

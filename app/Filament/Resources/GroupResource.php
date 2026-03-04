@@ -5,72 +5,87 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\GroupResource\Pages;
 use App\Filament\Resources\GroupResource\RelationManagers;
 use App\Models\Group;
-use Filament\Forms;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 
 class GroupResource extends Resource
 {
     protected static ?string $model = Group::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
-public static function getRelations(): array
-{
-    return [
-        RelationManagers\GroupMembersRelationManager::class,
-    ];
-}
 
-public static function form(Form $form): Form
-{
-    return $form
-        ->schema([
-            TextInput::make('name')
-                ->label('Group Name')
-                ->required(),
+    public static function getRelations(): array
+    {
+        return [
+            RelationManagers\GroupMembersRelationManager::class,
+        ];
+    }
 
-            Select::make('type')
-                ->label('Group Type')
-                ->options([
-                    'contribution' => 'Contribution',
-                    'rounds' => 'Rounds',
-                    'shared' => 'Shared Fund',
-                ])
-                ->required()
-                ->reactive() // Watch for changes
-                ->afterStateUpdated(function ($state, callable $set) {
-                    // Clear interest_rate if not shared
-                    if ($state !== 'shared') {
-                        $set('interest_rate', null);
-                    }
-                }),
+    public static function form(Form $form): Form
+    {
+        return $form
+            ->schema([
+                TextInput::make('name')
+                    ->label('Group Name')
+                    ->required(),
 
-            TextInput::make('contribution_amount')
-                ->label('Contribution Amount')
-                ->numeric(),
+                Select::make('type')
+                    ->label('Group Type')
+                    ->options([
+                        'contribution' => 'Contribution',
+                        'rounds' => 'Rounds',
+                        'shared' => 'Shared Fund',
+                    ])
+                    ->live()
+                    ->required(),
 
-            Select::make('frequency')
-                ->label('Contribution Frequency')
-                ->options([
-                    'weekly' => 'Weekly',
-                    'bi-monthly' => 'Bi-Monthly',
-                    'monthly' => 'Monthly',
-                    'yearly' => 'Yearly',
-                ]),
+                TextInput::make('interest_rate')
+                    ->label('Interest Rate')
+                    ->numeric()
+                    ->suffix('%')
+                    ->minValue(0)
+                    ->visible(fn (callable $get) => $get('type') === 'shared')
+                    ->required(fn (callable $get) => $get('type') === 'shared'),
 
-            TextInput::make('interest_rate')
-                ->label('Interest Rate (%)')
-                ->numeric()
-                ->visible(fn ($get) => $get('type') === 'shared') // Show only if shared
-                ->required(fn ($get) => $get('type') === 'shared'), // Required only if shared
-        ]);
-}
+                TextInput::make('target_amount')
+                    ->label('Target Amount')
+                    ->numeric()
+                    ->required(),
+
+                TextInput::make('contribution_amount')
+                    ->label('Contribution Amount')
+                    ->numeric()
+                    ->required(),
+
+                Select::make('frequency')
+                    ->label('Contribution Frequency')
+                    ->options([
+                        'daily' => 'Daily',
+                        'weekly' => 'Weekly',
+                        'monthly' => 'Monthly',
+                    ])
+                    ->required(),
+
+                Select::make('status')
+                    ->options([
+                        'active' => 'Active',
+                        'completed' => 'Completed',
+                        'cancelled' => 'Cancelled',
+                    ])
+                    ->default('active')
+                    ->required(),
+
+                TextInput::make('invite_code')
+                    ->label('Invite Code')
+                    ->maxLength(6)
+                    ->unique(ignoreRecord: true),
+            ]);
+    }
+
     public static function table(Table $table): Table
     {
         return $table
@@ -78,15 +93,29 @@ public static function form(Form $form): Form
                 Tables\Columns\TextColumn::make('name')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('type'),
+                Tables\Columns\TextColumn::make('target_amount')
+                    ->numeric()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('contribution_amount')
                     ->numeric()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('frequency'),
                 Tables\Columns\TextColumn::make('interest_rate')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('created_by')
-                    ->numeric()
+                    ->label('Interest Rate')
+                    ->suffix('%')
+                    ->sortable()
+                    ->toggleable(),
+                Tables\Columns\TextColumn::make('frequency'),
+                Tables\Columns\TextColumn::make('status')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'active' => 'success',
+                        'completed' => 'info',
+                        'cancelled' => 'danger',
+                    }),
+                Tables\Columns\TextColumn::make('invite_code')
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('creator.name')
+                    ->label('Creator')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
@@ -98,8 +127,8 @@ public static function form(Form $form): Form
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('members_count')
                     ->label('Members')
-                    ->counts('members') ,
-            
+                    ->counts('members'),
+
             ])
             ->filters([
                 //
@@ -113,12 +142,6 @@ public static function form(Form $form): Form
                 ]),
             ]);
     }
-
-
-    public function members()
-{
-    return $this->hasMany(GroupMember::class);
-}
 
     protected static function mutateFormDataBeforeCreate(array $data): array
     {
@@ -136,3 +159,4 @@ public static function form(Form $form): Form
         ];
     }
 }
+
