@@ -2,14 +2,15 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
 use App\Models\Contribution;
 use App\Models\GroupMember;
 use Carbon\Carbon;
+use Illuminate\Console\Command;
 
 class NotifyOverdueContributions extends Command
 {
     protected $signature = 'notify:overdue-contributions';
+
     protected $description = 'Notify members with overdue contributions';
 
     public function handle()
@@ -17,7 +18,7 @@ class NotifyOverdueContributions extends Command
         $now = Carbon::now();
 
         // Get all group members
-        $members = GroupMember::with('user','group')->get();
+        $members = GroupMember::with('user', 'group')->get();
 
         foreach ($members as $member) {
             $group = $member->group;
