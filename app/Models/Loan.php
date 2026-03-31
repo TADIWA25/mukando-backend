@@ -72,7 +72,7 @@ class Loan extends Model
         return $this->status === 'paid' || $this->remaining_balance <= 0;
     }
 
-    /**
+    /**a
      * Check if the loan is overdue
      */
     public function isOverdue(): bool
