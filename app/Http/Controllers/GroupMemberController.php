@@ -93,6 +93,7 @@ class GroupMemberController extends Controller
             ->firstOrFail();
 
         $requestingUserId = $request->user()->id;
+        $isSelfRemoval = $memberRecord->user_id === $requestingUserId;
 
         $admin = GroupMember::query()
             ->where('group_id', $group->id)
@@ -100,11 +101,11 @@ class GroupMemberController extends Controller
             ->where('role', 'admin')
             ->exists();
 
-        if (! $admin) {
+        if (! $admin && ! $isSelfRemoval) {
             abort(403, 'Only group admins can remove members.');
         }
 
-        if ($memberRecord->user_id === $requestingUserId) {
+        if ($admin && $isSelfRemoval) {
             return response()->json([
                 'status' => false,
                 'message' => 'Admins cannot remove themselves.',
@@ -115,7 +116,7 @@ class GroupMemberController extends Controller
 
         return response()->json([
             'status' => true,
-            'message' => 'Member removed from group.',
+            'message' => $isSelfRemoval ? 'You have left the group.' : 'Member removed from group.',
         ]);
     }
 

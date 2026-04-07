@@ -10,6 +10,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
 
 class GroupController extends Controller
@@ -102,7 +103,7 @@ class GroupController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'type' => ['required', 'in:contribution,rounds,shared'],
-            'target_amount' => ['required', 'numeric', 'gt:0'],
+            'target_amount' => ['nullable', 'numeric', 'gt:0'],
             'contribution_amount' => ['required', 'numeric', 'gt:0'],
             'interest_rate' => ['nullable', 'numeric', 'min:0'],
             'frequency' => ['required', 'in:daily,weekly,monthly'],
@@ -110,14 +111,31 @@ class GroupController extends Controller
             'start_date' => ['required', 'date'],
         ]);
 
+        if ($validated['type'] === 'contribution' && ! isset($validated['target_amount'])) {
+            throw ValidationException::withMessages([
+                'target_amount' => 'The target amount field is required for contribution groups.',
+            ]);
+        }
+
+        if (
+            $validated['type'] === 'contribution'
+            && (float) $validated['contribution_amount'] > (float) $validated['target_amount']
+        ) {
+            throw ValidationException::withMessages([
+                'contribution_amount' => 'The contribution amount must be less than or equal to the target amount.',
+            ]);
+        }
+
+        $targetAmount = $validated['target_amount'] ?? $validated['contribution_amount'];
+
         $userId = $request->user()->id;
 
         try {
-            $group = DB::transaction(function () use ($validated, $userId) {
+            $group = DB::transaction(function () use ($validated, $userId, $targetAmount) {
                 $group = Group::query()->create([
                     'name' => $validated['name'],
                     'type' => $validated['type'],
-                    'target_amount' => $validated['target_amount'],
+                    'target_amount' => $targetAmount,
                     'contribution_amount' => $validated['contribution_amount'],
                     'interest_rate' => $validated['interest_rate'] ?? 0,
                     'frequency' => $validated['frequency'],

@@ -6,11 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\Contribution;
 use App\Models\Group;
 use App\Models\GroupMember;
-use Carbon\Carbon;
+use App\Models\Loan;
+use App\Models\LoanPayment;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
 
 class GroupController extends Controller
@@ -20,27 +21,21 @@ class GroupController extends Controller
         $groups = $request->user()->groups()->with(['members.user'])->get();
 
         $data = $groups->map(function ($group) {
-            // contributions query simply fetches all rows for the group;
-            // cycles are no longer relevant to the front end so we ignore them.
-            $contributions = Contribution::where('group_id', $group->id)
-                ->get()
-                ->groupBy('user_id')
-                ->mapWithKeys(fn ($grouped, $userId) => [$userId => $grouped->first()]);
+            $currentCycle = $group->currentContributionCycle();
+            $currentCycleId = $currentCycle?->id;
+            $currentCycleContributions = $this->getCurrentCycleContributions($group, $currentCycleId);
 
-            $totalContributed = Contribution::query()
-                ->where('group_id', $group->id)
-                ->where('status', 'paid')
-                ->sum('amount_paid');
+            $totalContributed = $this->getDisplayedPoolAmount($group);
 
             $groupArray = $group->toArray();
             $groupArray['total_contributed'] = number_format((float) $totalContributed, 2, '.', '');
 
-            $groupArray['members'] = $group->members->map(function ($member) use ($contributions) {
-                $contribution = $contributions->get($member->user_id);
-                // determine status based on amount_paid rather than stored status if present
+            $groupArray['current_cycle'] = $this->serializeCycle($currentCycle);
+            $groupArray['members'] = $group->members->map(function ($member) use ($currentCycleContributions) {
+                $contribution = $currentCycleContributions->get($member->user_id);
                 $status = 'pending';
                 if ($contribution) {
-                    $status = $contribution->amount_paid > 0 ? 'paid' : $contribution->status;
+                    $status = (float) $contribution->amount_paid > 0 ? 'paid' : $contribution->status;
                 }
 
                 $memberArray = $member->toArray();
@@ -67,25 +62,43 @@ class GroupController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
             'name' => 'required|string',
             'type' => 'required|in:contribution,rounds,shared',
-            'target_amount' => 'required|numeric|min:0.01',
-            'contribution_amount' => 'required|numeric|min:0.01|lte:target_amount',
+            'target_amount' => 'nullable|numeric|min:0.01',
+            'contribution_amount' => 'required|numeric|min:0.01',
             'interest_rate' => 'nullable|numeric|min:0',
             'frequency' => 'required|in:daily,weekly,monthly',
             'start_date' => 'required|date',
         ]);
 
+        if ($validated['type'] === 'contribution' && ! isset($validated['target_amount'])) {
+            throw ValidationException::withMessages([
+                'target_amount' => 'The target amount field is required for contribution groups.',
+            ]);
+        }
+
+        if (
+            $validated['type'] === 'contribution'
+            && (float) $validated['contribution_amount'] > (float) $validated['target_amount']
+        ) {
+            throw ValidationException::withMessages([
+                'contribution_amount' => 'The contribution amount must be less than or equal to the target amount.',
+            ]);
+        }
+
+        $targetAmount = $validated['target_amount'] ?? $validated['contribution_amount'];
+
         try {
-            $group = DB::transaction(function () use ($request) {
+            $group = DB::transaction(function () use ($request, $validated, $targetAmount) {
                 $group = Group::create([
-                    'name' => $request->name,
-                    'type' => $request->type,
-                    'target_amount' => $request->target_amount,
-                    'contribution_amount' => $request->contribution_amount,
-                    'interest_rate' => $request->interest_rate ?? 0,
-                    'frequency' => $request->frequency,
+                    'name' => $validated['name'],
+                    'type' => $validated['type'],
+                    'target_amount' => $targetAmount,
+                    'contribution_amount' => $validated['contribution_amount'],
+                    'interest_rate' => $validated['interest_rate'] ?? 0,
+                    'frequency' => $validated['frequency'],
+                    'start_date' => $validated['start_date'],
                     'status' => 'active',
                     'created_by' => $request->user()->id,
                 ]);
@@ -96,11 +109,28 @@ class GroupController extends Controller
                     'role' => 'admin',
                 ]);
 
-                Contribution::create([
-                    'group_id' => $group->id,
-                    'user_id' => $request->user()->id,
-                    'status' => 'pending',
-                ]);
+                if ($group->type !== 'shared') {
+                    $currentCycle = $group->currentContributionCycle();
+
+                    if ($currentCycle) {
+                        Contribution::query()->firstOrCreate(
+                            [
+                                'group_id' => $group->id,
+                                'cycle_id' => $currentCycle->id,
+                                'user_id' => $request->user()->id,
+                            ],
+                            [
+                                'status' => 'pending',
+                            ]
+                        );
+                    }
+                } else {
+                    Contribution::create([
+                        'group_id' => $group->id,
+                        'user_id' => $request->user()->id,
+                        'status' => 'pending',
+                    ]);
+                }
 
                 return $group;
             });
@@ -153,12 +183,11 @@ class GroupController extends Controller
             ->where('status', 'paid')
             ->sum('amount_paid');
 
-        // fetch contributions for the group
-        $contributions = Contribution::query()
-            ->where('group_id', $group->id)
-            ->get()
-            ->groupBy('user_id')
-            ->mapWithKeys(fn ($grouped, $userId) => [$userId => $grouped->first()]);
+        $displayedPool = $this->getDisplayedPoolAmount($group);
+
+        $currentCycle = $group->currentContributionCycle();
+        $currentCycleId = $currentCycle?->id;
+        $contributions = $this->getCurrentCycleContributions($group, $currentCycleId);
 
         $members = $group->members->map(function ($member) use ($contributions) {
             $contribution = $contributions->get($member->user_id);
@@ -189,7 +218,8 @@ class GroupController extends Controller
             'interest_rate' => $group->interest_rate,
             'frequency' => $group->frequency,
             'status' => $group->status,
-            'total_contributed' => number_format((float) $totalContributed, 2, '.', ''),
+            'total_contributed' => number_format((float) $displayedPool, 2, '.', ''),
+            'current_cycle' => $this->serializeCycle($currentCycle),
             'members' => $members,
         ];
 
@@ -199,5 +229,61 @@ class GroupController extends Controller
                 ? array_merge($data, ['invite_code' => $group->invite_code])
                 : $data,
         ], 200);
+    }
+
+    private function getCurrentCycleContributions(Group $group, ?int $currentCycleId)
+    {
+        $query = Contribution::query()
+            ->where('group_id', $group->id);
+
+        if ($group->type === 'shared' || $currentCycleId === null) {
+            $query->whereNull('cycle_id');
+        } else {
+            $query->where('cycle_id', $currentCycleId);
+        }
+
+        return $query->get()->keyBy('user_id');
+    }
+
+    private function serializeCycle($cycle): ?array
+    {
+        if (! $cycle) {
+            return null;
+        }
+
+        return [
+            'id' => $cycle->id,
+            'cycle_number' => $cycle->cycle_number,
+            'due_date' => $cycle->due_date?->toDateString() ?? $cycle->due_date,
+            'status' => $cycle->status,
+        ];
+    }
+
+    private function getDisplayedPoolAmount(Group $group): float
+    {
+        if ($group->type === 'shared') {
+            $totalContributions = (float) Contribution::query()
+                ->where('group_id', $group->id)
+                ->where('status', 'paid')
+                ->sum('amount_paid');
+
+            $totalDisbursed = (float) Loan::query()
+                ->where('group_id', $group->id)
+                ->whereIn('status', ['approved', 'paid'])
+                ->sum('amount');
+
+            $totalRepayments = (float) LoanPayment::query()
+                ->whereHas('loan', function ($query) use ($group) {
+                    $query->where('group_id', $group->id);
+                })
+                ->sum('amount');
+
+            return max(0, $totalContributions - $totalDisbursed + $totalRepayments);
+        }
+
+        return (float) Contribution::query()
+            ->where('group_id', $group->id)
+            ->where('status', 'paid')
+            ->sum('amount_paid');
     }
 }

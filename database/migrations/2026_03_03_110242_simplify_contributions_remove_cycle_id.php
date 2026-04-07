@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -11,23 +12,87 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('contributions', function (Blueprint $table) {
-            // Drop foreign keys first to allow index dropping
-            $table->dropForeign(['cycle_id']);
-            $table->dropForeign(['group_id']);
-            $table->dropForeign(['user_id']);
-            
-            // Now drop the unique indexes
-            $table->dropUnique('contributions_group_user_cycle_unique');
-            $table->dropUnique('contributions_cycle_id_user_id_unique');
-            
-            // Drop the cycle_id column
-            $table->dropColumn('cycle_id');
-            
-            // Add unique index for group_id and user_id
-            $table->unique(['group_id', 'user_id'], 'contributions_group_user_unique');
-            
-            // Re-add foreign keys for group_id and user_id
+        if (! Schema::hasTable('contributions')) {
+            return;
+        }
+
+        $hasCycleId = Schema::hasColumn('contributions', 'cycle_id');
+        $hasGroupUserCycleUnique = collect(DB::select("SHOW INDEX FROM contributions WHERE Key_name = 'contributions_group_user_cycle_unique'"))->isNotEmpty();
+        $hasCycleUserUnique = collect(DB::select("SHOW INDEX FROM contributions WHERE Key_name = 'contributions_cycle_id_user_id_unique'"))->isNotEmpty();
+        $hasGroupUserUnique = collect(DB::select("SHOW INDEX FROM contributions WHERE Key_name = 'contributions_group_user_unique'"))->isNotEmpty();
+        $databaseName = DB::getDatabaseName();
+        $hasCycleIdForeignKey = collect(DB::select(
+            'SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ? AND REFERENCED_TABLE_NAME IS NOT NULL',
+            [$databaseName, 'contributions', 'cycle_id']
+        ))->isNotEmpty();
+        $hasGroupIdForeignKey = collect(DB::select(
+            'SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ? AND REFERENCED_TABLE_NAME IS NOT NULL',
+            [$databaseName, 'contributions', 'group_id']
+        ))->isNotEmpty();
+        $hasUserIdForeignKey = collect(DB::select(
+            'SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ? AND REFERENCED_TABLE_NAME IS NOT NULL',
+            [$databaseName, 'contributions', 'user_id']
+        ))->isNotEmpty();
+        $duplicates = DB::table('contributions')
+            ->selectRaw("
+                MAX(id) as keep_id,
+                group_id,
+                user_id,
+                MAX(CASE WHEN status = 'paid' THEN 1 ELSE 0 END) as has_paid,
+                MAX(amount_paid) as amount_paid,
+                MAX(paid_at) as paid_at,
+                MAX(marked_by) as marked_by
+            ")
+            ->groupBy('group_id', 'user_id')
+            ->havingRaw('COUNT(*) > 1')
+            ->get();
+
+        foreach ($duplicates as $duplicate) {
+            DB::table('contributions')
+                ->where('id', $duplicate->keep_id)
+                ->update([
+                    'status' => $duplicate->has_paid ? 'paid' : 'pending',
+                    'amount_paid' => $duplicate->amount_paid,
+                    'paid_at' => $duplicate->paid_at,
+                    'marked_by' => $duplicate->marked_by,
+                ]);
+
+            DB::table('contributions')
+                ->where('group_id', $duplicate->group_id)
+                ->where('user_id', $duplicate->user_id)
+                ->where('id', '!=', $duplicate->keep_id)
+                ->delete();
+        }
+
+        Schema::table('contributions', function (Blueprint $table) use ($hasCycleId, $hasCycleIdForeignKey, $hasGroupIdForeignKey, $hasUserIdForeignKey, $hasGroupUserCycleUnique, $hasCycleUserUnique, $hasGroupUserUnique) {
+            if ($hasCycleId && $hasCycleIdForeignKey) {
+                $table->dropForeign(['cycle_id']);
+            }
+
+            if ($hasGroupIdForeignKey) {
+                $table->dropForeign(['group_id']);
+            }
+
+            if ($hasUserIdForeignKey) {
+                $table->dropForeign(['user_id']);
+            }
+
+            if ($hasGroupUserCycleUnique) {
+                $table->dropUnique('contributions_group_user_cycle_unique');
+            }
+
+            if ($hasCycleUserUnique) {
+                $table->dropUnique('contributions_cycle_id_user_id_unique');
+            }
+
+            if ($hasCycleId) {
+                $table->dropColumn('cycle_id');
+            }
+
+            if (! $hasGroupUserUnique) {
+                $table->unique(['group_id', 'user_id'], 'contributions_group_user_unique');
+            }
+
             $table->foreign('group_id')->references('id')->on('groups')->cascadeOnDelete();
             $table->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
         });

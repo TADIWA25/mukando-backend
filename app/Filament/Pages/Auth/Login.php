@@ -37,6 +37,8 @@ class Login extends BaseLogin
 
         if (str_starts_with($phone, '0')) {
             $phone = '263'.substr($phone, 1);
+        } elseif (str_starts_with($phone, '7') && strlen($phone) === 9) {
+            $phone = '263'.$phone;
         }
 
         return [

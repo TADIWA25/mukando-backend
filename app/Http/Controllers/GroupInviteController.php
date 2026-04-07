@@ -88,15 +88,32 @@ class GroupInviteController extends Controller
                 ]
             );
 
-            Contribution::query()->firstOrCreate(
-                [
-                    'group_id' => $group->id,
-                    'user_id' => $userId,
-                ],
-                [
-                    'status' => 'pending',
-                ]
-            );
+            if ($group->type !== 'shared') {
+                $currentCycle = $group->currentContributionCycle();
+
+                if ($currentCycle) {
+                    Contribution::query()->firstOrCreate(
+                        [
+                            'group_id' => $group->id,
+                            'cycle_id' => $currentCycle->id,
+                            'user_id' => $userId,
+                        ],
+                        [
+                            'status' => 'pending',
+                        ]
+                    );
+                }
+            } else {
+                Contribution::query()->firstOrCreate(
+                    [
+                        'group_id' => $group->id,
+                        'user_id' => $userId,
+                    ],
+                    [
+                        'status' => 'pending',
+                    ]
+                );
+            }
 
             return $member;
         });

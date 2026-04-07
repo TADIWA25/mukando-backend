@@ -25,13 +25,63 @@ class ContributionController extends Controller
         $validated = $request->validate([
             'user_id' => ['required', 'exists:users,id'],
             'group_id' => ['required', 'exists:groups,id'],
+            'cycle_id' => ['nullable', 'exists:contribution_cycles,id'],
             'amount' => ['required', 'numeric', 'min:0'],
         ]);
+
+        $group = Group::query()->findOrFail($validated['group_id']);
+        $currentUserId = $request->user()->id;
+
+        $membership = GroupMember::query()
+            ->where('group_id', $group->id)
+            ->where('user_id', $currentUserId)
+            ->first();
+
+        if (! $membership) {
+            return response()->json([
+                'status' => false,
+                'message' => 'You are not a member of this group.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        if ($membership->role !== 'admin' && (int) $validated['user_id'] !== $currentUserId) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Only admins can record payments for other members.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $cycleId = $validated['cycle_id'] ?? null;
+
+        if ($group->type !== 'shared') {
+            if (! $cycleId) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'A contribution cycle is required for this group.',
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            $cycleBelongsToGroup = $group->contributionCycles()
+                ->where('id', $cycleId)
+                ->exists();
+
+            if (! $cycleBelongsToGroup) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Invalid contribution cycle for this group.',
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+        }
 
         // Check if a contribution already exists for this user in this group
         $existingContribution = Contribution::query()
             ->where('user_id', $validated['user_id'])
             ->where('group_id', $validated['group_id'])
+            ->when(
+                $cycleId === null,
+                fn ($query) => $query->whereNull('cycle_id'),
+                fn ($query) => $query->where('cycle_id', $cycleId)
+            )
             ->first();
 
         if ($existingContribution) {
@@ -47,6 +97,7 @@ class ContributionController extends Controller
                         'amount_paid' => $validated['amount'],
                         'status' => 'paid',
                         'paid_at' => Carbon::now(),
+                        'marked_by' => auth()->id(),
                     ]);
 
                     // Update GroupMember record
@@ -79,9 +130,11 @@ class ContributionController extends Controller
                 $contribution = Contribution::create([
                     'user_id' => $validated['user_id'],
                     'group_id' => $validated['group_id'],
+                    'cycle_id' => $validated['cycle_id'] ?? null,
                     'amount_paid' => $validated['amount'],
                     'status' => 'paid',
                     'paid_at' => Carbon::now(),
+                    'marked_by' => auth()->id(),
                 ]);
 
                 // Update GroupMember record
@@ -117,4 +170,3 @@ class ContributionController extends Controller
         }
     }
 }
-

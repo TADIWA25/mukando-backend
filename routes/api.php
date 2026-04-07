@@ -38,7 +38,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/groups/{group}/loans', [LoanController::class, 'index']);
     Route::post('/groups/{group}/loans', [LoanController::class, 'store']);
     // Loan applications from frontend (stored in loan_applications table).
+    Route::get('/groups/{group}/loan-applications', [LoanApplicationController::class, 'index']);
     Route::post('/groups/{group}/loan-applications', [LoanApplicationController::class, 'store']);
+    Route::patch('/groups/{group}/loan-applications/{loanApplication}', [LoanApplicationController::class, 'update']);
     Route::get('/groups/{group}/loans/{loan}', [LoanController::class, 'show']);
     Route::patch('/groups/{group}/loans/{loan}', [LoanController::class, 'update']);
     Route::delete('/groups/{group}/loans/{loan}', [LoanController::class, 'destroy']);

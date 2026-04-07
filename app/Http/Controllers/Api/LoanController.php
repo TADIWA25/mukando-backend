@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Contribution;
 use App\Models\Group;
 use App\Models\GroupMember;
 use App\Models\Loan;
@@ -170,6 +171,14 @@ class LoanController extends Controller
             'duration_months' => ['nullable', 'integer', 'min:1', 'max:36'],
         ]);
 
+        $memberTotalContributions = $this->getMemberTotalContributions($group->id, $request->user()->id);
+        if ((float) $validated['amount'] > $memberTotalContributions) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Loan amount cannot exceed your total paid contributions of $'.number_format($memberTotalContributions, 2).'.',
+            ], 422);
+        }
+
         $groupMaxContribution = (float) ($group->contribution_amount ?? 0);
         if ((float) $validated['amount'] > $groupMaxContribution) {
             return response()->json([
@@ -292,8 +301,25 @@ class LoanController extends Controller
             ], 403);
         }
 
-        $loan->status = $newStatus;
-        $loan->save();
+        if ($newStatus === 'approved' && $loan->status !== 'approved') {
+            $availablePool = $this->getAvailablePoolAmount($group->id);
+            if ((float) $loan->amount > $availablePool) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Loan amount exceeds the available shared pool of $'.number_format($availablePool, 2).'.',
+                ], 422);
+            }
+        }
+
+        $previousStatus = $loan->status;
+        DB::transaction(function () use ($loan, $newStatus) {
+            $loan->status = $newStatus;
+            $loan->save();
+        });
+
+        if ($newStatus === 'approved' && $previousStatus !== 'approved') {
+            $this->syncGroupPoolAmount($group->id);
+        }
 
         return response()->json([
             'status' => true,
@@ -351,6 +377,7 @@ class LoanController extends Controller
             'amount' => $validated['amount'],
             'paid_at' => now(),
         ]);
+        $this->syncGroupPoolAmount($group->id);
 
         // Check if loan is now fully paid
         $totalPaid = $loan->payments()->sum('amount');
@@ -454,5 +481,42 @@ class LoanController extends Controller
             'message' => 'Your loans retrieved successfully',
             'data' => $loans,
         ]);
+    }
+
+    private function getMemberTotalContributions(int $groupId, int $userId): float
+    {
+        return (float) Contribution::query()
+            ->where('group_id', $groupId)
+            ->where('user_id', $userId)
+            ->where('status', 'paid')
+            ->sum('amount_paid');
+    }
+
+    private function getAvailablePoolAmount(int $groupId): float
+    {
+        $totalContributions = (float) Contribution::query()
+            ->where('group_id', $groupId)
+            ->where('status', 'paid')
+            ->sum('amount_paid');
+
+        $totalDisbursed = (float) Loan::query()
+            ->where('group_id', $groupId)
+            ->whereIn('status', ['approved', 'paid'])
+            ->sum('amount');
+
+        $totalRepayments = (float) LoanPayment::query()
+            ->whereHas('loan', function ($query) use ($groupId) {
+                $query->where('group_id', $groupId);
+            })
+            ->sum('amount');
+
+        return max(0, $totalContributions - $totalDisbursed + $totalRepayments);
+    }
+
+    private function syncGroupPoolAmount(int $groupId): void
+    {
+        Group::query()
+            ->where('id', $groupId)
+            ->update(['total_collected' => $this->getAvailablePoolAmount($groupId)]);
     }
 }
